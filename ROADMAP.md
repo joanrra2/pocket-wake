@@ -1,6 +1,6 @@
 # Roadmap
 
-The MVP covers one board, one-tap wake with confirmation, and setup with a connection
+Current status: **beta** (0.1.x). The MVP covers one board, one-tap wake with confirmation, and setup with a connection
 test. Below are the use cases the code is already shaped for, roughly in the order they
 make sense. Items marked **(firmware)** also need a change in the Pocket AdBlock
 firmware.
@@ -40,11 +40,18 @@ background service.
 - **MQTT over WebSocket (wss, port 8084)** for networks that block port 8883.
 - **Client certificates (mTLS)** for brokers that require them.
 
-## More from the board **(firmware)**
+## More from the board
 
-The bridge could publish more, and the app would show it on the board card:
+The firmware's MQTT bridge already publishes ad-blocking data that the app can show
+without firmware changes:
 
-- Ad-blocking stats (queries today, % blocked) and a **pause blocking for 5 min** button.
+- **Blocking switch**: `<prefix>/blocking` (`ON`/`OFF`, retained) and
+  `<prefix>/blocking/set`, so the app can pause and resume blocking.
+- **Stats**: `<prefix>/stats` every 60 s (queries blocked/allowed, blocked share,
+  blocklist size, active clients) for a small stats card.
+
+These would need firmware changes **(firmware)**:
+
 - Board health: uptime, Wi-Fi signal, firmware version, update available.
 - Per-PC details: last time seen online, IP and MAC address, last wake result as seen by
   the board.

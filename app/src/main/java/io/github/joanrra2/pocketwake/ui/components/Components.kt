@@ -145,6 +145,20 @@ fun SectionTitle(
     }
 }
 
+/** Small "BETA" label shown next to the app name while the app is in beta. */
+@Composable
+fun BetaPill(modifier: Modifier = Modifier) {
+    Text(
+        "BETA",
+        modifier = modifier
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.tertiaryContainer)
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onTertiaryContainer,
+    )
+}
+
 /** Monospace text for topics. */
 @Composable
 fun Mono(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurfaceVariant) {

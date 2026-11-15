@@ -1,5 +1,12 @@
 # Pocket Wake
 
+![Status: beta](https://img.shields.io/badge/status-beta-orange)
+[![Build](https://github.com/joanrra2/pocket-wake/actions/workflows/build.yml/badge.svg)](https://github.com/joanrra2/pocket-wake/actions/workflows/build.yml)
+
+> **Beta.** Pocket Wake works end to end, but it's new: expect rough edges, and please
+> report problems in [Issues](https://github.com/joanrra2/pocket-wake/issues). Settings may
+> need re-entering between beta versions.
+
 One-tap Wake-on-LAN for your PCs, from anywhere, through the MQTT bridge of a
 [Pocket AdBlock](https://github.com/joanrra2/pocket-adblock) board.
 
@@ -37,23 +44,20 @@ home network, checks that the PC answers, and the app shows **Online after 23 s*
 
 ## Setup
 
-1. **On the board** (web UI, Wake-on-LAN / MQTT): turn on the MQTT bridge, note the
-   **topic prefix** (default `sinkhole`) and give each PC a name. Give PCs an IP if you
-   want live online/offline dots.
-2. **On your broker** create a **separate login for the phone** (don't reuse the board's).
-   It needs:
-   - publish: `<prefix>/wol/+/set`
-   - subscribe: `<prefix>/wol/+/state`, `<prefix>/status`
-3. **In the app**: tap **Set up broker** and enter
-   - Address: the broker host only, e.g. `abc123.ala.eu-central-1.emqxsl.com`
-     (no `mqtts://`)
-   - Port **8883** with **TLS** on (EMQX Cloud Serverless "MQTT over TLS")
-   - Username and password of the phone login
-   - Topic prefix, same as on the board
+**Step-by-step guide: [docs/SETUP.md](docs/SETUP.md)**. It covers the PC (BIOS, Windows),
+the broker (EMQX Cloud Serverless with separate logins for the board and the phone), the
+board's web UI, the app, and troubleshooting.
 
-   Tap **Test connection**: you should see *Connected*, *Board online* and your PCs.
-   Then **Save**.
-4. Tap **Wake** on a PC.
+In short:
+
+1. **PC**: wired Ethernet, Wake-on-LAN on in BIOS/UEFI and the network adapter, Windows
+   fast startup off.
+2. **Broker**: create a TLS broker and **two logins**, one for the board and one for the phone.
+3. **Board** (`http://sinkhole.local/`): *Settings → Remote wake (MQTT)*: Broker URI
+   `mqtts://<broker>:8883`, the board login, prefix `sinkhole`; restart. Then
+   *Wake → Add a computer* with its name, MAC and (for the online dot) its IP.
+4. **App**: *Set up broker*: broker address (host only), port 8883, TLS on, the **phone**
+   login, the same prefix. *Test connection*, *Save*, then **Wake**.
 
 ### Topics used
 
@@ -63,22 +67,14 @@ home network, checks that the PC answers, and the app shows **Online after 23 s*
 | `<prefix>/wol/<name>/state` | board → app | `online` / `offline` (retained; only PCs with an IP) |
 | `<prefix>/status` | board → app | `online` / `offline` (retained, last will) |
 
-### Troubleshooting
-
-| Message | What to check |
-|---|---|
-| Wrong username or password | The phone login on the broker. |
-| Login refused | The broker's access rules (ACL) for the phone login. |
-| The broker closed the connection. Is port … a TLS port? | Use 8883 with TLS on (or 1883 with TLS off on brokers that allow it). |
-| Certificate isn't trusted / doesn't match | Use the broker's host name, not an IP address. |
-| No board status under `<prefix>/status` | The prefix differs from the board's, or the board's MQTT bridge is off. |
-| No answer after 3 min | Wake-on-LAN in the PC's BIOS/UEFI and network adapter, wired Ethernet, PC on mains power. |
+Problems? See [Troubleshooting](docs/SETUP.md#troubleshooting).
 
 ## Install
 
 - **Debug builds**: every push builds `pocket-wake-debug-<n>`, under *Actions → Build →
   Artifacts* (unzip it to get the APK).
-- **Releases**: tags `v*` publish a signed APK on the *Releases* page.
+- **Releases**: tags `v*` publish a signed APK on the *Releases* page. Beta tags such as
+  `v0.1.0-beta.1` are marked as pre-releases.
 
 Allow "Install unknown apps" for your browser or file manager when Android asks.
 Debug and release builds install side by side (the debug one is "Pocket Wake (debug)").
@@ -133,7 +129,7 @@ under *Settings → Secrets and variables → Actions*. Base64 for the first sec
 Then push a tag:
 
 ```bash
-git tag v0.1.0 && git push origin v0.1.0
+git tag v0.1.0-beta.1 && git push origin v0.1.0-beta.1
 ```
 
 To sign locally instead, set `POCKETWAKE_KEYSTORE_FILE` (a path) and the three
