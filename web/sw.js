@@ -1,6 +1,6 @@
 // Offline start for the installed app. Network first, so updates show up on the next
 // launch; the cached copy is used only when offline. MQTT traffic never goes through here.
-const CACHE = 'pocketwake-v3';
+const CACHE = 'pocketwake-v4';
 const SHELL = [
   './', 'index.html', 'css/app.css', 'js/app.js', 'js/core.js', 'js/store.js', 'js/broker.js',
   'vendor/mqtt.esm.js', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/apple-touch-icon.png',
@@ -21,8 +21,10 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
+  // Revalidate with the server (GitHub Pages lets browsers cache for 10 min) so a new
+  // version shows up on the next launch.
   e.respondWith(
-    fetch(req)
+    fetch(new Request(req, { cache: 'no-cache' }))
       .then((res) => {
         if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
         return res;
