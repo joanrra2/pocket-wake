@@ -53,7 +53,14 @@ data class Host(
  * Immutable set of hosts plus the rules that change it. Every function returns a new book;
  * the ViewModel keeps the current one in a StateFlow.
  */
-data class HostBook(val hosts: Map<String, Host> = emptyMap()) {
+data class HostBook(
+    val hosts: Map<String, Host> = emptyMap(),
+    /**
+     * Last wakes saved in earlier sessions, including PCs not discovered yet in this one
+     * (discovered PCs only appear after connecting). Applied whenever such a PC appears.
+     */
+    val savedLastWakes: Map<String, LastWake> = emptyMap(),
+) {
 
     /** Hosts sorted by name (case-insensitive, then exact) so cards never jump around. */
     val sorted: List<Host>
@@ -63,17 +70,23 @@ data class HostBook(val hosts: Map<String, Host> = emptyMap()) {
 
     val anyBusy: Boolean get() = hosts.values.any { it.wake.isBusy }
 
-    private fun put(host: Host) = copy(hosts = hosts + (host.name to host))
+    private fun put(host: Host): HostBook {
+        val h = if (host.lastWake == null) savedLastWakes[host.name]?.let { host.copy(lastWake = it) } ?: host else host
+        return copy(hosts = hosts + (h.name to h))
+    }
     private fun edit(name: String, f: (Host) -> Host) = hosts[name]?.let { put(f(it)) } ?: this
 
     fun withManual(names: Collection<String>): HostBook =
         names.fold(this) { book, n -> book.addManual(n) }
 
-    fun withLastWakes(last: Map<String, LastWake>): HostBook =
-        copy(hosts = hosts.mapValues { (n, h) -> last[n]?.let { h.copy(lastWake = it) } ?: h })
+    fun withLastWakes(last: Map<String, LastWake>): HostBook = copy(
+        hosts = hosts.mapValues { (n, h) -> last[n]?.let { h.copy(lastWake = it) } ?: h },
+        savedLastWakes = savedLastWakes + last,
+    )
 
+    /** Saved values plus the current ones, so PCs not shown right now keep theirs. */
     fun lastWakes(): Map<String, LastWake> =
-        hosts.values.mapNotNull { h -> h.lastWake?.let { h.name to it } }.toMap()
+        savedLastWakes + hosts.values.mapNotNull { h -> h.lastWake?.let { h.name to it } }.toMap()
 
     fun addManual(name: String): HostBook =
         put(hosts[name]?.copy(manual = true) ?: Host(name = name, manual = true))

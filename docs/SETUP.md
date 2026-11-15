@@ -7,7 +7,8 @@ About 20 minutes the first time. You need:
 
 - a Pocket AdBlock board already running on your home network,
 - a PC on **wired Ethernet** (Wake-on-LAN over Wi-Fi almost never works),
-- an Android phone (Android 8.0 or newer),
+- a phone: **Android** 8.0 or newer (the app), or an **iPhone / iPad** or any other device with
+  a modern browser (the web app),
 - a free MQTT broker account (this guide uses **EMQX Cloud Serverless**; any MQTT broker
   with TLS works).
 
@@ -28,7 +29,8 @@ The checklist, in order:
 2. [Create the broker and two logins](#2-create-the-mqtt-broker)
 3. [Connect the board to the broker](#3-connect-the-board)
 4. [Add the PC on the board](#4-add-the-pc-on-the-board)
-5. [Install and set up the app](#5-install-and-set-up-the-app)
+5. [Install and set up the app](#5-install-and-set-up-the-app): [Android](#5a-android-app) or
+   [iPhone / any browser](#5b-iphone-ipad-or-any-browser-web-app)
 6. [Wake it](#6-wake-it)
 
 ---
@@ -73,16 +75,17 @@ then, so names may differ slightly.
    in about a minute.
 3. On the deployment's **Overview**, note:
    - **Address**, e.g. `x1a2b3c4.ala.eu-central-1.emqxsl.com`
-   - **MQTT over TLS port**: `8883`
+   - **MQTT over TLS port**: `8883` (the board and the Android app use this one)
+   - **WebSocket over TLS port**: `8084`, path `/mqtt` (the web app uses this one)
 
    No certificate needs downloading: EMQX Cloud's certificate chains to *DigiCert Global
-   Root G2*, which both the board and Android already trust.
+   Root G2*, which the board, Android, iOS and every current browser already trust.
 4. **Access Control → Authentication → Add**. Create **two** logins, one for each device:
 
    | Username (example) | Used by | Password |
    |---|---|---|
    | `pocket-board` | the board | a long random one |
-   | `pocket-phone` | the phone app | a different long random one |
+   | `pocket-phone` | the phone app or web app | a different long random one |
 
    Separate logins mean you can change or revoke the phone's access without touching the
    board, and the phone never holds the board's password.
@@ -131,6 +134,10 @@ start, fix that first (step 1): the app uses exactly the same wake.
 
 ## 5. Install and set up the app
 
+Both versions do the same thing and can be used side by side with the same phone login.
+
+### 5a. Android app
+
 1. **Get the APK**:
    - *Releases* page of this repository (signed builds), or
    - *Actions → Build →* latest run *→ Artifacts → pocket-wake-debug-…* (a zip containing
@@ -155,6 +162,26 @@ start, fix that first (step 1): the app uses exactly the same wake.
 
 The password is stored encrypted with a key that never leaves the phone's Android
 Keystore. The app connects only while it's open, so it uses no battery in the background.
+
+### 5b. iPhone, iPad or any browser (web app)
+
+1. Open **https://joanrra2.github.io/pocket-wake/** in Safari (iPhone/iPad) or any current browser.
+2. iPhone/iPad: tap **Share → Add to Home Screen**. Pocket Wake then gets its own icon and
+   opens full-screen like an app. (Chrome on Android or desktop offers **Install** instead.)
+3. Tap **Set up broker** and fill in:
+   - **Address**: the broker address **only**, e.g. `x1a2b3c4.ala.eu-central-1.emqxsl.com`
+   - **Port** `8084` and **Path** `/mqtt` (WebSocket over TLS; browsers can't use 8883)
+   - **Username** / **Password**: the **phone** login (`pocket-phone`)
+   - **Remember the password on this device**: leave it ticked on your own phone; untick
+     it on a shared device and you'll type the password each time.
+   - **Topic prefix**: same as on the board (`sinkhole`)
+4. **Test connection**, then **Save**, exactly as in the Android app.
+
+About the web app's storage: settings stay in this browser only. The password is
+encrypted with a key the browser generates and refuses to export, but it lives in the
+same browser profile as the page, so it's less protected than the Android Keystore. Using
+a separate phone login that can only wake PCs keeps the risk small. *Forget this device*
+in settings erases everything.
 
 ## 6. Wake it
 
@@ -185,7 +212,8 @@ Then connect to the PC with Remote Desktop, RustDesk, AnyDesk, Parsec…
 |---|---|
 | Wrong username or password | Use the **phone** login; re-type the password (Show reveals it). |
 | Login refused: check … access rules | An authorization rule blocks the phone login (step 2.5). |
-| The broker closed the connection. Is port … a TLS port? | Port 8883 with TLS **on**. Port 1883 is plain MQTT (not available on EMQX Serverless). |
+| The broker closed the connection. Is port … a TLS port? | Android app: port 8883 with TLS **on**. Port 1883 is plain MQTT (not available on EMQX Serverless). |
+| Can't reach wss://… (web app) | Port 8084 and path `/mqtt` for EMQX Cloud; check the address. Browsers don't say which part failed. |
 | Can't find `<host>` | Typo in the address, or no internet on the phone. |
 | The broker's TLS certificate isn't trusted / doesn't match | Use the host name from the EMQX overview, not an IP address. |
 | No board status under `sinkhole/status` | The prefix differs between board and app, the board isn't connected (step 3.4), or the phone login can't subscribe to `sinkhole/status`. |

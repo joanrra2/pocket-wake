@@ -124,4 +124,18 @@ class HostBookTest {
         val b = HostBook().addManual("beta").addManual("Alpha").addManual("alpha")
         assertEquals(listOf("Alpha", "alpha", "beta"), b.sorted.map { it.name })
     }
+
+    @Test fun `saved last wakes reach PCs discovered later and are never dropped`() {
+        val saved = mapOf("NAS" to LastWake(t0, 41), "GONE" to LastWake(t0, 9))
+        var b = HostBook().withLastWakes(saved)
+        assertTrue(b.hosts.isEmpty())
+        b = b.onState("NAS", Presence.ONLINE, t0 + 1, live = false)
+        assertEquals(LastWake(t0, 41), b["NAS"]!!.lastWake)
+        // A newer wake replaces the saved one; PCs not shown keep theirs.
+        b = b.onState("NAS", Presence.OFFLINE, t0 + 2)
+            .onWakeRequested("NAS", t0 + 10).onWakePublished("NAS", t0 + 11)
+            .onState("NAS", Presence.ONLINE, t0 + 20_010)
+        assertEquals(LastWake(t0 + 10, 20), b["NAS"]!!.lastWake)
+        assertEquals(mapOf("NAS" to LastWake(t0 + 10, 20), "GONE" to LastWake(t0, 9)), b.lastWakes())
+    }
 }

@@ -1,6 +1,7 @@
 # Roadmap
 
-Current status: **beta** (0.1.x). The MVP covers one board, one-tap wake with confirmation, and setup with a connection
+Current status: **beta** (0.1.x), as an Android app and a web app (iPhone, iPad, any
+browser). The MVP covers one board, one-tap wake with confirmation, and setup with a connection
 test. Below are the use cases the code is already shaped for, roughly in the order they
 make sense. Items marked **(firmware)** also need a change in the Pocket AdBlock
 firmware.
@@ -18,7 +19,8 @@ firmware.
   the phone's login.
 
 All of these connect only for the few seconds a wake takes; still no permanent
-background service.
+background service. Widgets and tiles are Android-only; on iPhone the web app's home-screen
+icon is the closest equivalent (an iOS Shortcut that opens the page is another option).
 
 ## More PCs, more control
 

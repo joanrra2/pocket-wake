@@ -10,6 +10,12 @@
 One-tap Wake-on-LAN for your PCs, from anywhere, through the MQTT bridge of a
 [Pocket AdBlock](https://github.com/joanrra2/pocket-adblock) board.
 
+Two ways to use it, same features and look:
+
+- **Android app** (APK): see [Install](#install).
+- **Web app for iPhone, iPad and any browser**: open **https://joanrra2.github.io/pocket-wake/** and, on iPhone, tap
+  *Share → Add to Home Screen*. Nothing to install from a store.
+
 Pick a PC, tap **Wake**, and watch it come up: the board sends the magic packet on your
 home network, checks that the PC answers, and the app shows **Online after 23 s**.
 
@@ -68,6 +74,28 @@ In short:
 | `<prefix>/status` | board → app | `online` / `offline` (retained, last will) |
 
 Problems? See [Troubleshooting](docs/SETUP.md#troubleshooting).
+
+## Web app (iPhone, iPad, any browser)
+
+<img src="docs/screenshots/web-home.jpg" width="250" alt="The web app on a phone: connected, three PCs, one just woken">
+
+**https://joanrra2.github.io/pocket-wake/**: a static page (in [`web/`](web/)) published with GitHub Pages. It uses MQTT
+over secure WebSocket (EMQX Cloud: port **8084**, path **/mqtt**), because browsers can't
+open raw MQTT connections. Same screens and wake flow as the Android app.
+
+- Add it to the iPhone home screen (*Share → Add to Home Screen*) to get an app icon and
+  full-screen view. Android/desktop Chrome offers *Install*.
+- Connects only while the page is open. No analytics, no other servers; a strict Content
+  Security Policy limits the page to its own files and WebSocket connections.
+- The password is saved only if you tick *Remember*, encrypted with a non-extractable
+  browser key. That's weaker than the Android Keystore (the key lives in the same browser
+  profile, and the page shares the `joanrra2.github.io` origin), so use a separate phone
+  login that can only wake PCs.
+- MQTT library: [MQTT.js](https://github.com/mqttjs/MQTT.js) 5.16.1 (MIT), vendored in
+  `web/vendor/`.
+
+Develop: serve `web/` with any static server (`python -m http.server -d web 8765`) and run
+the unit tests with `node --test` inside `web/`.
 
 ## Install
 
@@ -137,7 +165,9 @@ password/alias variables before `./gradlew assembleRelease`.
 
 ## How it works
 
-- Kotlin, Jetpack Compose (Material 3, dynamic colour on Android 12+), minSdk 26.
+- Android: Kotlin, Jetpack Compose (Material 3, dynamic colour on Android 12+), minSdk 26.
+- Web: plain HTML/CSS/JavaScript modules, no build step; `web/js/core.js` mirrors the
+  Android `core/` logic and has its own unit tests.
 - MQTT 3.1.1 with the [HiveMQ MQTT Client](https://github.com/hivemq/hivemq-mqtt-client)
   (Apache-2.0); reconnects with backoff (1 → 30 s) on network errors, stops on login or
   certificate errors.
