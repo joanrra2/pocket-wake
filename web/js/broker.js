@@ -36,8 +36,7 @@ function connectOptions(p, clientId) {
     keepalive: 30,
     connectTimeout: 10_000,
     reconnectPeriod: 0, // reconnects are scheduled below, with backoff
-    // Plain timers instead of MQTT.js's blob: Web Worker timers, which the CSP blocks.
-    // Background throttling doesn't matter: the page disconnects when hidden.
+    // Plain timers: background throttling doesn't matter, the page disconnects when hidden.
     timerVariant: 'native',
   };
 }
