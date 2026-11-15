@@ -1,0 +1,35 @@
+# Gradle / build output
+.gradle/
+build/
+.kotlin/
+captures/
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Local machine config (SDK path, personal Gradle settings)
+local.properties
+/gradle.properties.local
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# Signing material and secrets: never commit these
+*.jks
+*.keystore
+*.p12
+*.pem
+*.b64
+keystore.properties
+signing.properties
+release-signing/
+.env
+.env.*
+google-services.json
+
+# Claude Code local settings
+.claude/

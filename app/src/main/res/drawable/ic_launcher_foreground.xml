@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Power symbol, centred in the 66dp safe zone of a 108dp adaptive icon. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M43,40.68 A19,19 0 1,0 65,40.68"
+        android:strokeWidth="6.5"
+        android:strokeColor="@color/icon_fg"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M54,33 L54,55"
+        android:strokeWidth="6.5"
+        android:strokeColor="@color/icon_fg"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+</vector>
