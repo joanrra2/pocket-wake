@@ -95,6 +95,11 @@ dependencies {
         // Linux-only native transport; Android uses the NIO transport.
         exclude(group = "io.netty", module = "netty-transport-native-epoll")
     }
+    // Board QR scanning: decoded on the phone, no Google services or network.
+    implementation(libs.zxing.core)
+    implementation(libs.camerax.camera2)
+    implementation(libs.camerax.lifecycle)
+    implementation(libs.camerax.view)
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)
 

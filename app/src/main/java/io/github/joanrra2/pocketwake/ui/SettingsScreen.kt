@@ -26,6 +26,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -54,7 +55,9 @@ import io.github.joanrra2.pocketwake.core.Presence
 import io.github.joanrra2.pocketwake.core.Profile
 import io.github.joanrra2.pocketwake.core.Topics
 import io.github.joanrra2.pocketwake.mqtt.TestReport
+import io.github.joanrra2.pocketwake.scan.ScanScreen
 import io.github.joanrra2.pocketwake.ui.components.Mono
+import io.github.joanrra2.pocketwake.ui.components.QrScanIcon
 import io.github.joanrra2.pocketwake.ui.components.SectionTitle
 import io.github.joanrra2.pocketwake.ui.theme.LocalStatusColors
 
@@ -75,6 +78,32 @@ fun SettingsScreen(
     var prefix by rememberSaveable { mutableStateOf(saved.prefix) }
     var showPassword by rememberSaveable { mutableStateOf(false) }
     var triedSave by rememberSaveable { mutableStateOf(false) }
+    var scanning by rememberSaveable { mutableStateOf(false) }
+    var scanned by rememberSaveable { mutableStateOf<String?>(null) }
+
+    if (scanning) {
+        ScanScreen(
+            onResult = { link ->
+                val p = link.applyTo(
+                    Profile(host = host, port = port.toIntOrNull() ?: -1, tls = tls, username = username, password = password, prefix = prefix),
+                )
+                host = p.host
+                port = p.port.toString()
+                tls = p.tls
+                username = p.username
+                password = p.password
+                prefix = p.prefix
+                scanned = when {
+                    p.username.isEmpty() -> "Filled in from the board. Enter the phone's username and password, then Test connection."
+                    p.password.isEmpty() -> "Filled in from the board. Enter the password for ${p.username}, then Test connection."
+                    else -> "Filled in from the board. Test the connection, then Save."
+                }
+                scanning = false
+            },
+            onClose = { scanning = false },
+        )
+        return
+    }
 
     val draft = Profile(
         host = host,
@@ -109,6 +138,7 @@ fun SettingsScreen(
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 32.dp),
         ) {
+            ScanCard(note = scanned, onScan = { scanning = true })
             SectionTitle("Broker")
             OutlinedTextField(
                 value = host,
@@ -258,6 +288,30 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+@Composable
+private fun ScanCard(note: String?, onScan: () -> Unit) {
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+    ) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(QrScanIcon, null, Modifier.size(32.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Set up from the board", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                Text(
+                    note ?: "Board web page → Wake-on-LAN → Phone app shows a QR code with these settings.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            FilledTonalButton(onClick = onScan) { Text(if (note == null) "Scan" else "Scan again") }
         }
     }
 }

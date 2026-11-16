@@ -41,7 +41,9 @@ home network, checks that the PC answers, and the app shows **Online after 23 s*
 
 ## Privacy and permissions
 
-- Only the `INTERNET` permission. No analytics, no ads, no trackers, no background
+- `INTERNET`, plus `CAMERA` only when you tap **Scan** to read the board's setup QR code.
+  Frames are decoded on the phone with [ZXing](https://github.com/zxing/zxing) (Apache 2.0):
+  no Google services, nothing uploaded. No analytics, no ads, no trackers, no background
   service: the app connects only while it is open and disconnects when you leave it.
 - The broker password is encrypted (AES-256-GCM) with a key held in the Android Keystore.
   App backups are disabled.
@@ -62,8 +64,10 @@ In short:
 3. **Board** (`http://sinkhole.local/`): *Settings → Remote wake (MQTT)*: Broker URI
    `mqtts://<broker>:8883`, the board login, prefix `sinkhole`; restart. Then
    *Wake → Add a computer* with its name, MAC and (for the online dot) its IP.
-4. **App**: *Set up broker*: broker address (host only), port 8883, TLS on, the **phone**
-   login, the same prefix. *Test connection*, *Save*, then **Wake**.
+4. **App**: *Set up broker* → **Scan** the QR code on the board's *Wake-on-LAN → Phone app*
+   card (address, port and prefix fill in), then type the **phone** login's password. Or
+   fill it in by hand: broker address (host only), port 8883, TLS on, the phone login, the
+   same prefix. *Test connection*, *Save*, then **Wake**.
 
 ### Topics used
 
@@ -83,6 +87,8 @@ Problems? See [Troubleshooting](docs/SETUP.md#troubleshooting).
 over secure WebSocket (EMQX Cloud: port **8084**, path **/mqtt**), because browsers can't
 open raw MQTT connections. Same screens and wake flow as the Android app.
 
+- Setup links: the board's QR code is a link to this page (`…/pocket-wake/#setup?host=…`),
+  so the iPhone Camera opens it with the broker settings filled in. It never carries a password.
 - Add it to the iPhone home screen (*Share → Add to Home Screen*) to get an app icon and
   full-screen view. Android/desktop Chrome offers *Install*.
 - Connects only while the page is open. No analytics, no other servers; a strict Content

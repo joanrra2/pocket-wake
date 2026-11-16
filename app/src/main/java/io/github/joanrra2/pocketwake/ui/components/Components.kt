@@ -164,3 +164,18 @@ fun BetaPill(modifier: Modifier = Modifier) {
 fun Mono(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurfaceVariant) {
     Text(text, modifier = modifier, style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), color = color)
 }
+
+/** QR-scan icon (Material Symbols "qr_code_scanner", Apache 2.0), without pulling in icons-extended. */
+val QrScanIcon: androidx.compose.ui.graphics.vector.ImageVector by lazy {
+    androidx.compose.ui.graphics.vector.ImageVector.Builder(
+        name = "QrScan", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f,
+    ).addPath(
+        pathData = androidx.compose.ui.graphics.vector.PathParser().parsePathString(
+            "M9.5,6.5v3h-3v-3H9.5M11,5H5v6h6V5L11,5zM9.5,14.5v3h-3v-3H9.5M11,13H5v6h6V13L11,13zM17.5,6.5v3h-3v-3H17.5" +
+                "M19,5h-6v6h6V5L19,5zM13,13h1.5v1.5H13V13zM14.5,14.5H16V16h-1.5V14.5zM16,13h1.5v1.5H16V13zM13,16h1.5v1.5H13V16z" +
+                "M14.5,17.5H16V19h-1.5V17.5zM16,16h1.5v1.5H16V16zM17.5,14.5H19V16h-1.5V14.5zM17.5,17.5H19V19h-1.5V17.5z" +
+                "M22,7h-2V4h-3V2h5V7zM22,22v-5h-2v3h-3v2H22zM2,22h5v-2H4v-3H2V22zM2,2v5h2V4h3V2H2z",
+        ).toNodes(),
+        fill = androidx.compose.ui.graphics.SolidColor(Color.Black),
+    ).build()
+}

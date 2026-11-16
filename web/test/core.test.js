@@ -160,3 +160,28 @@ test('saved last wakes reach PCs discovered later and are never dropped', () => 
   assert.deepEqual(C.adoptLastWakes(b, saved).NAS.lastWake, { at: t0 + 10, s: 20 });
   assert.deepEqual(C.mergeLastWakes(saved, b), { NAS: { at: t0 + 10, s: 20 }, GONE: { at: t0, s: 9 } });
 });
+
+test('reads the setup link a board shows', () => {
+  const r = C.parseSetupLink('https://joanrra2.github.io/pocket-wake/#setup?v=1&host=x1.ala.eu-central-1.emqxsl.com&port=8883&tls=1&wsport=8084&wspath=%2Fmqtt&prefix=sinkhole&user=phone');
+  assert.ok(r.ok);
+  assert.deepEqual(r.link, { host: 'x1.ala.eu-central-1.emqxsl.com', port: 8883, tls: true, prefix: 'sinkhole', username: 'phone', wsPort: 8084, wsPath: '/mqtt' });
+  const d = C.parseSetupLink('#setup?host=b.lan&tls=0&prefix=home%2Fwake%2F&user=');
+  assert.deepEqual(d.link, { host: 'b.lan', port: 1883, tls: false, prefix: 'home/wake', username: null, wsPort: null, wsPath: null });
+});
+
+test('rejects other links and bad setup values', () => {
+  assert.equal(C.parseSetupLink('https://example.com/').message, "This isn't a Pocket Wake setup link");
+  assert.equal(C.parseSetupLink('#setup?port=1').message, 'The setup link has no valid broker address');
+  assert.equal(C.parseSetupLink('#setup?host=b&port=70000').message, 'The setup link has an invalid port');
+  assert.match(C.parseSetupLink('#setup?host=b&prefix=a%23').message, /invalid prefix/);
+  assert.match(C.parseSetupLink('#setup?v=2&host=b').message, /newer/);
+});
+
+test('a setup link fills the web profile but never a password', () => {
+  const link = C.parseSetupLink('#setup?host=new.example&wsport=8443&wspath=%2Fws&user=phone&password=leak&pass=leak').link;
+  const p = C.applySetupLink({ ...C.defaultProfile(), host: 'old.example', username: 'phone', password: 'secret' }, link);
+  assert.deepEqual([p.host, p.port, p.path, p.username, p.password], ['new.example', 8443, '/ws', 'phone', '']);
+  const same = C.parseSetupLink('#setup?host=OLD.example&prefix=other').link;
+  const kept = C.applySetupLink({ ...C.defaultProfile(), host: 'old.example', username: 'phone', password: 'secret' }, same);
+  assert.deepEqual([kept.port, kept.path, kept.username, kept.password, kept.prefix], [8084, '/mqtt', 'phone', 'secret', 'other']);
+});

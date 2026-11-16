@@ -145,7 +145,11 @@ Both versions do the same thing and can be used side by side with the same phone
    - build it yourself (see the README).
 2. Open the APK on the phone. If Android asks, allow **Install unknown apps** for the
    browser or file manager you used.
-3. Open **Pocket Wake → Set up broker** and fill in:
+3. Open **Pocket Wake → Set up broker**. The quickest way: on a computer, open the
+   board's web page → **Wake-on-LAN** → **Phone app** card, type the phone's username
+   (`pocket-phone`) there, and tap **Scan** in the app (allow the camera when asked). The
+   address, port, TLS, username and prefix fill in; type the password. The QR code never
+   contains a password. Or fill everything in by hand:
    - **Address**: the broker address **only**, e.g. `x1a2b3c4.ala.eu-central-1.emqxsl.com`
      (no `mqtts://`, no port)
    - **Port** `8883`, **TLS** on
@@ -168,7 +172,13 @@ Keystore. The app connects only while it's open, so it uses no battery in the ba
 1. Open **https://joanrra2.github.io/pocket-wake/** in Safari (iPhone/iPad) or any current browser.
 2. iPhone/iPad: tap **Share → Add to Home Screen**. Pocket Wake then gets its own icon and
    opens full-screen like an app. (Chrome on Android or desktop offers **Install** instead.)
-3. Tap **Set up broker** and fill in:
+3. Quickest: point the iPhone **Camera** at the QR code on the board's **Wake-on-LAN →
+   Phone app** card (on a computer) and tap the link. Pocket Wake opens with the address,
+   port 8084, path and prefix filled in; type the password. If you added Pocket Wake to the
+   home screen before scanning, check its settings too: some iOS versions keep home-screen
+   apps' storage apart from Safari's.
+
+   Or tap **Set up broker** and fill in:
    - **Address**: the broker address **only**, e.g. `x1a2b3c4.ala.eu-central-1.emqxsl.com`
    - **Port** `8084` and **Path** `/mqtt` (WebSocket over TLS; browsers can't use 8883)
    - **Username** / **Password**: the **phone** login (`pocket-phone`)

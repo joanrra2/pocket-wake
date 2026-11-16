@@ -2,7 +2,8 @@
 
 Current status: **beta** (0.1.x), as an Android app and a web app (iPhone, iPad, any
 browser). The MVP covers one board, one-tap wake with confirmation, and setup with a connection
-test. Below are the use cases the code is already shaped for, roughly in the order they
+test, plus QR setup from the board (Android scans it; on iPhone the camera opens the web
+app with the settings filled in). Below are the use cases the code is already shaped for, roughly in the order they
 make sense. Items marked **(firmware)** also need a change in the Pocket AdBlock
 firmware.
 
@@ -14,9 +15,6 @@ firmware.
   the app.
 - **Launcher shortcuts**: long-press the app icon for "Wake <PC>" (dynamic shortcuts
   for the last-woken PCs, and pinned shortcuts).
-- **QR setup** **(firmware)**: the board's web UI shows a QR code with the broker host,
-  port, TLS and prefix (never the board's password). The app scans it and only asks for
-  the phone's login.
 
 All of these connect only for the few seconds a wake takes; still no permanent
 background service. Widgets and tiles are Android-only; on iPhone the web app's home-screen

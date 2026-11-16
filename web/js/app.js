@@ -23,6 +23,8 @@ const state = {
   triedSave: false,
   showPassword: false,
   installHintDismissed: false,
+  draft: null, // settings filled in from a setup link, not saved yet
+  setupNote: null,
 };
 
 let session = null;
@@ -194,6 +196,7 @@ async function runTest() {
 }
 
 function go(view) {
+  if (view !== 'settings') { state.draft = null; state.setupNote = null; }
   state.view = view;
   state.menuFor = null;
   state.triedSave = false;
@@ -203,7 +206,25 @@ function go(view) {
   window.scrollTo(0, 0);
 }
 
+/** Opens the settings filled in from a board's setup link (#setup?…), if the address has one. */
+function applySetupFromUrl() {
+  if (!location.hash.startsWith('#setup?')) return false;
+  const r = C.parseSetupLink(location.hash);
+  history.replaceState(null, '', configured() ? '#settings' : location.pathname);
+  if (!r.ok) { toast(r.message); return false; }
+  const p = C.applySetupLink(state.profile, r.link);
+  state.draft = p;
+  state.setupNote = !p.username ? "Enter this device's username and password, then Test connection."
+    : !p.password ? `Enter the password for ${p.username}, then Test connection.`
+    : 'Test the connection, then Save.';
+  state.view = 'settings';
+  state.triedSave = false;
+  state.testReport = null;
+  return true;
+}
+
 window.addEventListener('popstate', () => {
+  if (applySetupFromUrl()) { render(true); return; }
   const v = location.hash === '#settings' || !configured() ? 'settings' : 'home';
   if (v !== state.view) { state.view = v; render(true); }
 });
@@ -406,7 +427,7 @@ function field(name, label, value, { type = 'text', placeholder = '', help = '',
 }
 
 function renderSettings() {
-  const p = state.profile;
+  const p = state.draft ?? state.profile;
   const back = configured();
   app.innerHTML = `
   <header class="topbar">
@@ -415,6 +436,7 @@ function renderSettings() {
   </header>
   <main class="wrap">
     <form id="settings-form" novalidate>
+      ${state.setupNote ? `<div class="banner ok mt8">${icon('check', 'lead')}<div class="grow"><div class="t">Filled in from your board</div><div class="b">${esc(state.setupNote)}</div></div></div>` : ''}
       <div class="h-section">Broker</div>
       ${field('host', 'Address', p.host, { placeholder: 'abc123.ala.eu-central-1.emqxsl.com', mode: 'url' })}
       <div class="row top">
@@ -602,6 +624,7 @@ async function start() {
   savedLastWakes = Store.loadLastWakes();
   setBook(C.withManual({}, Store.loadManual()));
   state.view = location.hash === '#settings' ? 'settings' : 'home';
+  applySetupFromUrl();
   render(true);
   if (document.visibilityState === 'visible') connect();
   scheduleTick();

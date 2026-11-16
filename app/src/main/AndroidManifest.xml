@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- The only permission: talk to your MQTT broker. -->
+    <!-- Talk to your MQTT broker. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Optional: read the board's setup QR code. Asked only when you tap Scan; frames stay on the phone. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
         android:allowBackup="false"

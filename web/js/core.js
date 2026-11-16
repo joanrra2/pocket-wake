@@ -98,6 +98,56 @@ export function brokerUrl(raw) {
   return `wss://${p.host}:${p.port}${p.path}`;
 }
 
+// --- setup link (the QR code a board shows under Wake-on-LAN → Phone app) ----------------
+//
+// https://joanrra2.github.io/pocket-wake/#setup?v=1&host=…&port=8883&tls=1&wsport=8084&wspath=%2Fmqtt&prefix=sinkhole&user=…
+// port/tls are for the Android app (MQTT over TLS); wsport/wspath for this web app. Never a password.
+
+/** { ok: true, link } or { ok: false, message }. */
+export function parseSetupLink(text) {
+  const t = String(text ?? '').trim();
+  const at = t.indexOf('#setup?');
+  if (at < 0) return { ok: false, message: "This isn't a Pocket Wake setup link" };
+  const q = new URLSearchParams(t.slice(at + '#setup?'.length));
+  if (Number(q.get('v') || 1) > 1) return { ok: false, message: 'This setup link is newer than the app. Reload the page' };
+  const host = (q.get('host') || '').trim();
+  if (!host || /[\s/]/.test(host)) return { ok: false, message: 'The setup link has no valid broker address' };
+  const tls = q.get('tls') !== '0';
+  const port = q.has('port') ? Number(q.get('port')) : tls ? 8883 : 1883;
+  if (!Number.isInteger(port) || port < 1 || port > 65535) return { ok: false, message: 'The setup link has an invalid port' };
+  const prefix = Topics.normalizePrefix(q.get('prefix') ?? DEFAULT_PREFIX);
+  const pe = Topics.prefixError(prefix);
+  if (pe) return { ok: false, message: `The setup link has an invalid prefix: ${pe}` };
+  const ws = Number(q.get('wsport'));
+  const wsPath = q.get('wspath') || '';
+  return {
+    ok: true,
+    link: {
+      host, port, tls, prefix,
+      username: (q.get('user') || '').trim() || null,
+      wsPort: Number.isInteger(ws) && ws >= 1 && ws <= 65535 ? ws : null,
+      wsPath: wsPath.startsWith('/') ? wsPath : null,
+    },
+  };
+}
+
+/** The web profile with the link's settings; the password stays only if the broker and user are unchanged. */
+export function applySetupLink(profile, link) {
+  const p = normalizeProfile(profile);
+  const username = link.username ?? p.username;
+  const port = link.wsPort ?? DEFAULT_WSS_PORT;
+  const same = p.host.toLowerCase() === link.host.toLowerCase() && p.port === port && p.username === username;
+  return {
+    ...p,
+    host: link.host,
+    port,
+    path: link.wsPath ?? DEFAULT_WSS_PATH,
+    prefix: link.prefix,
+    username,
+    password: same ? p.password : '',
+  };
+}
+
 // --- hosts and wakes ------------------------------------------------------------------
 //
 // host = { name, presence: 'online'|'offline'|'unknown', presenceSince, reportsState, manual,
