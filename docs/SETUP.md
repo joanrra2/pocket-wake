@@ -3,9 +3,16 @@
 > **Pocket Wake is in beta.** It works end to end, but expect rough edges. Please report
 > problems in [Issues](https://github.com/joanrra2/pocket-wake/issues).
 
-About 20 minutes the first time. You need:
+About 20 minutes the first time. Prefer to watch first? Here is the whole setup in under
+two minutes ([MP4](media/wake-setup-en.mp4); en español: [GIF](media/wake-setup-es.gif) ·
+[MP4](media/wake-setup-es.mp4)). Every address, login and device in it is an example.
 
-- a Pocket AdBlock board already running on your home network,
+<p align="center"><img src="media/wake-setup-en.gif" width="800" alt="Setup walkthrough: prepare the PC, create a free EMQX Cloud broker with two logins, connect the board, add the PC, scan the board's QR code with the phone, test the connection and wake the PC"></p>
+
+You need:
+
+- a Pocket AdBlock board already running on your home network (firmware **0.4.3 or
+  newer** for the setup QR code; older firmware works too, you then type the settings),
 - a PC on **wired Ethernet** (Wake-on-LAN over Wi-Fi almost never works),
 - a phone: **Android** 8.0 or newer (the app), or an **iPhone / iPad** or any other device with
   a modern browser (the web app),
@@ -67,20 +74,29 @@ Quick test: shut the PC down, check that the Ethernet port LEDs stay lit, and co
 
 ## 2. Create the MQTT broker
 
-The steps below are for EMQX Cloud Serverless (free tier). The console changes now and
-then, so names may differ slightly.
+The steps below are for EMQX Cloud Serverless, which is free for this use. The menu names
+are the ones in EMQX's documentation in November 2026; the console changes now and then,
+so they may differ slightly.
 
-1. Sign up at [emqx.com](https://www.emqx.com/en/cloud) and open the **Cloud Console**.
-2. **New Deployment → Serverless**. Pick the region closest to you and create it. It's ready
-   in about a minute.
-3. On the deployment's **Overview**, note:
-   - **Address**, e.g. `x1a2b3c4.ala.eu-central-1.emqxsl.com`
+1. Sign up at [emqx.com](https://www.emqx.com/en/cloud) (**Start Free**) and open the
+   **Cloud Console**. The first time, it asks you to create a **project**: any name.
+2. **New Deployment → Serverless**:
+   - **Spend Limit**: leave it at **0**. The deployment then only uses the free monthly
+     quota: 1 million session minutes and 1 GB of traffic, of which a board and a phone
+     use a small fraction.
+   - Give it a **Deployment Name**, accept the Serverless terms and click **Deploy**.
+     After about a minute its status says **Running**.
+3. Open the deployment's **Overview**. Under **Connection Information**, note:
+   - **Address**, e.g. `x1a2b3c4.ala.eu-central-1.emqxsl.com` (yours is different)
    - **MQTT over TLS port**: `8883` (the board and the Android app use this one)
    - **WebSocket over TLS port**: `8084`, path `/mqtt` (the web app uses this one)
 
-   No certificate needs downloading: EMQX Cloud's certificate chains to *DigiCert Global
-   Root G2*, which the board, Android, iOS and every current browser already trust.
-4. **Access Control → Authentication → Add**. Create **two** logins, one for each device:
+   Serverless only accepts encrypted connections (8883 and 8084); plain 1883 doesn't
+   exist there. No certificate needs downloading: EMQX Cloud's certificate chains to
+   *DigiCert Global Root G2*, which the board, Android, iOS and every current browser
+   already trust.
+4. **Access Control → Authentication → + Add**. Create **two** logins, one for each
+   device, and **Confirm** each:
 
    | Username (example) | Used by | Password |
    |---|---|---|
@@ -88,20 +104,30 @@ then, so names may differ slightly.
    | `pocket-phone` | the phone app or web app | a different long random one |
 
    Separate logins mean you can change or revoke the phone's access without touching the
-   board, and the phone never holds the board's password.
+   board, and the phone never holds the board's password. Keep both passwords in your
+   password manager: you type each one only once. (Serverless has no anonymous access, so
+   every device needs a login.)
 
-5. *Optional hardening.* **Access Control → Authorization**: limit what each login may
-   do (`sinkhole` is the default prefix; use yours):
+5. *Optional hardening: limit each login to its topics.* Under **Access Control →
+   Client Authorization**, on the **Username** tab, **+ Add** these rules with
+   permission **Allow** (`sinkhole` is the default prefix; use yours):
 
-   | Login | Action | Topic |
+   | Username | Action | Topic |
    |---|---|---|
-   | `pocket-board` | Subscribe | `sinkhole/wol/+/set`, `sinkhole/blocking/set` |
-   | `pocket-board` | Publish | `sinkhole/#`, `homeassistant/#` (only if you use Home Assistant) |
+   | `pocket-board` | Publish & Subscribe | `sinkhole/#` |
+   | `pocket-board` | Publish | `homeassistant/#` (only if you use Home Assistant) |
    | `pocket-phone` | Publish | `sinkhole/wol/+/set` |
-   | `pocket-phone` | Subscribe | `sinkhole/wol/+/state`, `sinkhole/status` |
+   | `pocket-phone` | Subscribe | `sinkhole/wol/+/state` |
+   | `pocket-phone` | Subscribe | `sinkhole/status` |
 
-   If you add rules, make sure nothing else denies these topics. A login that can't
-   subscribe shows up in the app as "No board status" and an empty list of PCs.
+   Then, on the **All Users** tab, add topic `#`, action **Publish & Subscribe**,
+   permission **Deny**. EMQX allows anything that no rule matches, so the rules above only
+   restrict anything once this catch-all deny is in place. A login that can't subscribe
+   shows up in the app as "No board status" and an empty list of PCs.
+
+Good to know: EMQX stops a Serverless deployment that has had no client connected for 30
+days in a row. With the board online that never happens; if it does, start it again from
+the console.
 
 ## 3. Connect the board
 
@@ -139,9 +165,9 @@ Both versions do the same thing and can be used side by side with the same phone
 ### 5a. Android app
 
 1. **Get the APK**:
-   - *Releases* page of this repository (signed builds), or
+   - *Releases* page of this repository (signed builds, once one is published), or
    - *Actions → Build →* latest run *→ Artifacts → pocket-wake-debug-…* (a zip containing
-     the debug APK), or
+     the debug APK; you need to be signed in to GitHub to download it), or
    - build it yourself (see the README).
 2. Open the APK on the phone. If Android asks, allow **Install unknown apps** for the
    browser or file manager you used.
@@ -221,7 +247,7 @@ Then connect to the PC with Remote Desktop, RustDesk, AnyDesk, Parsec…
 | Message | Fix |
 |---|---|
 | Wrong username or password | Use the **phone** login; re-type the password (Show reveals it). |
-| Login refused: check … access rules | An authorization rule blocks the phone login (step 2.5). |
+| Login refused: check … access rules | A Client Authorization rule blocks the phone login (step 2.5). |
 | The broker closed the connection. Is port … a TLS port? | Android app: port 8883 with TLS **on**. Port 1883 is plain MQTT (not available on EMQX Serverless). |
 | Can't reach wss://… (web app) | Port 8084 and path `/mqtt` for EMQX Cloud; check the address. Browsers don't say which part failed. |
 | Can't find `<host>` | Typo in the address, or no internet on the phone. |
@@ -239,9 +265,11 @@ Then connect to the PC with Remote Desktop, RustDesk, AnyDesk, Parsec…
 
 **Seeing the messages yourself**
 
-The EMQX console has an **Online Test** (WebSocket client). Connect with the phone login,
+Use a desktop MQTT client such as [MQTTX](https://mqttx.app/) (the one EMQX's docs
+suggest). Connect to your address on port 8883 with TLS on and the **phone** login,
 subscribe to `sinkhole/#`, and you'll see `sinkhole/status`, the PC states, and your wake
-requests as they happen.
+requests as they happen. (With the optional rules from step 2.5, the phone login only sees
+the topics it needs; that's expected.)
 
 ## What the app sends and receives
 

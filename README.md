@@ -56,6 +56,10 @@ home network, checks that the PC answers, and the app shows **Online after 23 s*
 the broker (EMQX Cloud Serverless with separate logins for the board and the phone), the
 board's web UI, the app, and troubleshooting.
 
+<p align="center"><img src="docs/media/wake-setup-en.gif" width="800" alt="Setup walkthrough: prepare the PC, create a free EMQX Cloud broker with two logins, connect the board, add the PC, scan the board's QR code with the phone, test the connection and wake the PC"></p>
+
+<p align="center">110-second walkthrough · <a href="docs/media/wake-setup-en.mp4">MP4</a> · En español: <a href="docs/media/wake-setup-es.gif">GIF</a> · <a href="docs/media/wake-setup-es.mp4">MP4</a></p>
+
 In short:
 
 1. **PC**: wired Ethernet, Wake-on-LAN on in BIOS/UEFI and the network adapter, Windows
