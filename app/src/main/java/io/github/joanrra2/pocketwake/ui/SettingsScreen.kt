@@ -38,6 +38,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -53,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import io.github.joanrra2.pocketwake.BuildConfigInfo
 import io.github.joanrra2.pocketwake.core.Presence
 import io.github.joanrra2.pocketwake.core.Profile
+import io.github.joanrra2.pocketwake.core.SetupLink
 import io.github.joanrra2.pocketwake.core.Topics
 import io.github.joanrra2.pocketwake.mqtt.TestReport
 import io.github.joanrra2.pocketwake.scan.ScanScreen
@@ -68,6 +70,8 @@ fun SettingsScreen(
     onSave: (Profile) -> Unit,
     onTest: (Profile) -> Unit,
     onBack: (() -> Unit)?,
+    incomingLink: SetupLink? = null,
+    onLinkUsed: () -> Unit = {},
 ) {
     val saved = ui.profile
     var host by rememberSaveable { mutableStateOf(saved.host) }
@@ -81,23 +85,36 @@ fun SettingsScreen(
     var scanning by rememberSaveable { mutableStateOf(false) }
     var scanned by rememberSaveable { mutableStateOf<String?>(null) }
 
+    // From the QR scanner, or a setup link sent by the Pocket AdBlock app.
+    fun applyLink(link: SetupLink) {
+        val p = link.applyTo(
+            Profile(host = host, port = port.toIntOrNull() ?: -1, tls = tls, username = username, password = password, prefix = prefix),
+        )
+        host = p.host
+        port = p.port.toString()
+        tls = p.tls
+        username = p.username
+        password = p.password
+        prefix = p.prefix
+        scanned = when {
+            p.username.isEmpty() -> "Filled in from the board. Enter the phone's username and password, then Test connection."
+            p.password.isEmpty() -> "Filled in from the board. Enter the password for ${p.username}, then Test connection."
+            else -> "Filled in from the board. Test the connection, then Save."
+        }
+    }
+
+    LaunchedEffect(incomingLink) {
+        incomingLink?.let {
+            scanning = false
+            applyLink(it)
+            onLinkUsed()
+        }
+    }
+
     if (scanning) {
         ScanScreen(
             onResult = { link ->
-                val p = link.applyTo(
-                    Profile(host = host, port = port.toIntOrNull() ?: -1, tls = tls, username = username, password = password, prefix = prefix),
-                )
-                host = p.host
-                port = p.port.toString()
-                tls = p.tls
-                username = p.username
-                password = p.password
-                prefix = p.prefix
-                scanned = when {
-                    p.username.isEmpty() -> "Filled in from the board. Enter the phone's username and password, then Test connection."
-                    p.password.isEmpty() -> "Filled in from the board. Enter the password for ${p.username}, then Test connection."
-                    else -> "Filled in from the board. Test the connection, then Save."
-                }
+                applyLink(link)
                 scanning = false
             },
             onClose = { scanning = false },

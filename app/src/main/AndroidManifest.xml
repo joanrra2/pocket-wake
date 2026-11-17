@@ -17,10 +17,20 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- The board's setup link (same as its QR code). The Pocket AdBlock app sends it
+                 here directly; never carries a password. Not auto-verified, so browsers keep
+                 opening it in the web app unless the user picks this app. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="joanrra2.github.io" android:pathPrefix="/pocket-wake" />
             </intent-filter>
         </activity>
     </application>
