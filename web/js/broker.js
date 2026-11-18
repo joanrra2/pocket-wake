@@ -2,7 +2,7 @@
 // The browser verifies the broker's TLS certificate itself; this page can only use wss://.
 
 import mqttModule from '../vendor/mqtt.esm.js';
-import { Topics, backoffSeconds, brokerUrl, normalizeProfile } from './core.js';
+import { Topics, backoffSeconds, brokerUrl, normalizeProfile, parseBlocking } from './core.js';
 
 const mqtt = typeof mqttModule.connect === 'function' ? mqttModule : mqttModule.default;
 
@@ -65,7 +65,8 @@ export function openSession(profile, clientId, filters, onConnection, onMessage)
     attempt = 0;
     lastError = null;
     onConnection({ kind: 'connected', since: Date.now() });
-    client.subscribe(filters, { qos: 1 });
+    // A refused optional topic (blocking, stats) just stays silent; the test reports it.
+    client.subscribe(filters, { qos: 1 }, () => {});
   });
 
   client.on('message', (topic, payload, packet) => {
@@ -126,7 +127,8 @@ export function openSession(profile, clientId, filters, onConnection, onMessage)
 
 /**
  * Connects once, listens briefly for the retained board status and PC states, disconnects.
- * Resolves { error } or { connectMillis, board: 'online'|'offline'|null, hosts: { name: presence } }.
+ * Resolves { error } or { connectMillis, board: 'online'|'offline'|null, hosts: { name: presence },
+ * denied: [filters the broker refused], blocking: true|false|null }.
  */
 export function testConnection(profile, clientId, listenMillis = 2500) {
   const p = normalizeProfile(profile);
@@ -134,6 +136,7 @@ export function testConnection(profile, clientId, listenMillis = 2500) {
     const started = performance.now();
     const client = mqtt.connect(brokerUrl(p), { ...connectOptions(p, `${clientId}-test`), connectTimeout: 15_000 });
     let board = null;
+    let blocking = null;
     const hosts = {};
     let done = false;
     let lastError = null;
@@ -147,6 +150,10 @@ export function testConnection(profile, clientId, listenMillis = 2500) {
     const guard = setTimeout(() => finish({ error: describeError(lastError ?? new Error('timeout'), p, false).message }), 20_000);
 
     client.on('message', (topic, payload) => {
+      if (topic === Topics.blocking(p.prefix)) {
+        blocking = parseBlocking(new TextDecoder().decode(payload)) ?? blocking;
+        return;
+      }
       const presence = Topics.parsePresence(new TextDecoder().decode(payload));
       if (!presence) return;
       if (topic === Topics.status(p.prefix)) board = presence === 'cleared' ? null : presence;
@@ -165,8 +172,13 @@ export function testConnection(profile, clientId, listenMillis = 2500) {
     });
     client.on('connect', () => {
       const connectMillis = Math.round(performance.now() - started);
-      client.subscribe([Topics.status(p.prefix), Topics.stateFilter(p.prefix)], { qos: 1 }, () => {
-        setTimeout(() => finish({ connectMillis, board, hosts: { ...hosts } }), listenMillis);
+      const filters = Topics.filters(p.prefix);
+      client.subscribe(filters, { qos: 1 }, (err, granted) => {
+        // MQTT 3.1.1 SUBACK return code 0x80 = refused by the broker's access rules. MQTT.js
+        // then reports an error that carries the SUBACK (codes in the order of the filters).
+        const codes = err?.packet?.granted ?? (granted || []).map((g) => g.qos);
+        const denied = filters.filter((f, i) => typeof codes[i] === 'number' && (codes[i] & 0x80) !== 0);
+        setTimeout(() => finish({ connectMillis, board, hosts: { ...hosts }, denied, blocking }), listenMillis);
       });
     });
   });

@@ -32,6 +32,18 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="joanrra2.github.io" android:pathPrefix="/pocket-wake" />
             </intent-filter>
+            <!-- Wake a PC from automation apps (Tasker, NFC tags): action ...WAKE with the
+                 extra "name", or a pocketwake://wake/<name> link. Both ask before waking. -->
+            <intent-filter>
+                <action android:name="io.github.joanrra2.pocketwake.WAKE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="pocketwake" android:host="wake" />
+            </intent-filter>
         </activity>
     </application>
 </manifest>

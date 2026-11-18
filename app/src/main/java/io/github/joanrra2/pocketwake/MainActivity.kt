@@ -8,13 +8,17 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -23,8 +27,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.joanrra2.pocketwake.core.SetupLink
+import io.github.joanrra2.pocketwake.shortcut.WakeShortcuts
 import io.github.joanrra2.pocketwake.ui.HomeScreen
 import io.github.joanrra2.pocketwake.ui.SettingsScreen
 import io.github.joanrra2.pocketwake.ui.WakeViewModel
@@ -35,14 +39,28 @@ class MainActivity : ComponentActivity() {
     // waiting to be shown in Broker settings.
     private var incomingLink by mutableStateOf<SetupLink?>(null)
 
+    // A wake asked for by another app or a pocketwake:// link, waiting for the user's OK.
+    private var askWake by mutableStateOf<String?>(null)
+
+    private val vm: WakeViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        if (savedInstanceState == null) readSetupLink(intent)
+        if (savedInstanceState == null) readIntent(intent)
         setContent {
             PocketWakeTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-                    PocketWakeApp(incomingLink = incomingLink, onLinkUsed = { incomingLink = null })
+                    PocketWakeApp(vm = vm, incomingLink = incomingLink, onLinkUsed = { incomingLink = null })
+                    askWake?.let { name ->
+                        AlertDialog(
+                            onDismissRequest = { askWake = null },
+                            title = { Text("Wake $name?") },
+                            text = { Text("Another app or a link asked Pocket Wake to wake this PC.") },
+                            confirmButton = { TextButton(onClick = { askWake = null; vm.wakeWhenReady(name) }) { Text("Wake") } },
+                            dismissButton = { TextButton(onClick = { askWake = null }) { Text("Cancel") } },
+                        )
+                    }
                 }
             }
         }
@@ -50,11 +68,21 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        readSetupLink(intent)
+        readIntent(intent)
+    }
+
+    private fun readIntent(intent: Intent?) {
+        val wake = WakeShortcuts.parse(intent, vm.shortcutToken)
+        when {
+            wake == null -> readSetupLink(intent)
+            !vm.ui.value.profile.isConfigured -> Toast.makeText(this, "Set up the broker first", Toast.LENGTH_LONG).show()
+            wake.trusted -> vm.wakeWhenReady(wake.name)
+            else -> askWake = wake.name
+        }
     }
 
     private fun readSetupLink(intent: Intent?) {
-        val data = intent?.takeIf { it.action == Intent.ACTION_VIEW }?.dataString ?: return
+        val data = intent?.takeIf { it.action == Intent.ACTION_VIEW && it.scheme == "https" }?.dataString ?: return
         when (val r = SetupLink.parse(data)) {
             is SetupLink.Companion.Result.Ok -> incomingLink = r.link
             is SetupLink.Companion.Result.Error -> Toast.makeText(this, r.message, Toast.LENGTH_LONG).show()
@@ -64,9 +92,9 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun PocketWakeApp(
+    vm: WakeViewModel,
     incomingLink: SetupLink?,
     onLinkUsed: () -> Unit,
-    vm: WakeViewModel = viewModel(),
 ) {
     val ui by vm.ui.collectAsStateWithLifecycle()
     var settingsOpen by rememberSaveable { mutableStateOf(!ui.profile.isConfigured) }
@@ -99,6 +127,9 @@ private fun PocketWakeApp(
                 onAddHost = vm::addHost,
                 onRemoveHost = vm::removeHost,
                 onRetry = vm::retry,
+                onSetBlocking = vm::setBlocking,
+                onCancelQueuedWake = vm::cancelQueuedWake,
+                onPin = vm::pinShortcut,
                 onOpenSettings = { settingsOpen = true },
             )
         }

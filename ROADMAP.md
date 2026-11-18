@@ -13,8 +13,8 @@ firmware.
   connects briefly, sends the wake, and shows the result on the widget.
 - **Quick Settings tile**: "Wake OFFICE-PC" from the notification shade. Long-press opens
   the app.
-- **Launcher shortcuts**: long-press the app icon for "Wake <PC>" (dynamic shortcuts
-  for the last-woken PCs, and pinned shortcuts).
+- ~~**Launcher shortcuts**~~: done in 0.2. Long-press the app icon for the last woken PCs,
+  or pin a "Wake <PC>" icon from the PC's menu.
 
 All of these connect only for the few seconds a wake takes; still no permanent
 background service. Widgets and tiles are Android-only; on iPhone the web app's home-screen
@@ -45,14 +45,25 @@ icon is the closest equivalent (an iOS Shortcut that opens the page is another o
 The firmware's MQTT bridge already publishes ad-blocking data that the app can show
 without firmware changes:
 
-- **Blocking switch**: `<prefix>/blocking` (`ON`/`OFF`, retained) and
-  `<prefix>/blocking/set`, so the app can pause and resume blocking.
-- **Stats**: `<prefix>/stats` every 60 s (queries blocked/allowed, blocked share,
-  blocklist size, active clients) for a small stats card.
+- ~~**Blocking switch**~~ and ~~**stats**~~: done in 0.2 (the *Ad blocking* card, Android
+  and web), from `<prefix>/blocking`, `<prefix>/blocking/set` and `<prefix>/stats`.
 
-These would need firmware changes **(firmware)**:
+Coming with Pocket AdBlock firmware 0.6.0 **(firmware)**; the app adds each one once its
+topics are final:
 
-- Board health: uptime, Wi-Fi signal, firmware version, update available.
+- **Wake timeout per PC and Cancel**: the board's own timeout replaces the app's fixed
+  3 minutes, and a Cancel button on "Waking…" stops the board's checks.
+- **Push alerts without a broker account (ntfy)**: the board can post "PC online",
+  "wake result", "update failed" and "restarted" to an ntfy topic it generates. The ntfy
+  app (or the web app) then notifies even when Pocket Wake is closed, which Pocket Wake
+  itself can't do without a background service. ntfy could also become a second way to
+  wake (a "wake NAME" command), for people who don't want an MQTT broker.
+- **Watch-only hosts** (NAS, printer, a server): online/offline dot, no Wake button.
+- **Board health over MQTT** with a real clock: firmware version, uptime, last restart
+  and its reason, Wi-Fi signal, update available. Shown on the connection card.
+
+Still open **(firmware)**:
+
 - Per-PC details: last time seen online, IP and MAC address, last wake result as seen by
   the board.
 - **Shutdown or sleep** of a PC, via a small companion agent on the PC that listens to an
@@ -60,9 +71,9 @@ These would need firmware changes **(firmware)**:
 
 ## Integrations
 
-- **Intents for automation apps** (Tasker, Home Assistant companion, NFC tags): a
-  documented `io.github.joanrra2.pocketwake.WAKE` action with the PC name.
-- **Deep links** such as `pocketwake://wake/OFFICE-PC`, for buttons in other apps.
+- ~~**Intents for automation apps**~~ and ~~**deep links**~~: done in 0.2.
+  `io.github.joanrra2.pocketwake.WAKE` with the extra `name`, or
+  `pocketwake://wake/OFFICE-PC`; both ask before waking.
 - **Wear OS tile** with the favourite PCs.
 
 ## Quality

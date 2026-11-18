@@ -4,6 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import com.github.takahirom.roborazzi.captureRoboImage
+import io.github.joanrra2.pocketwake.core.Blocking
+import io.github.joanrra2.pocketwake.core.BoardStats
 import io.github.joanrra2.pocketwake.core.HostBook
 import io.github.joanrra2.pocketwake.core.LastWake
 import io.github.joanrra2.pocketwake.core.Presence
@@ -65,6 +67,8 @@ class ScreenshotTest {
         book = sampleBook(),
         lastMessageAt = now - 4_000,
         now = now,
+        blocking = Blocking(on = true),
+        stats = BoardStats(blocked = 1834, allowed = 4127, percent = 30.7, domains = 139_651, clients = 6, at = now - 40_000),
     )
 
     private fun shot(name: String, dark: Boolean = false, content: @Composable () -> Unit) {
@@ -77,9 +81,9 @@ class ScreenshotTest {
     @Composable
     private fun Home(ui: UiState) = HomeScreen(ui, noop, noop, noop, noop, {}, {})
 
-    @Test @Config(qualifiers = "w400dp-h1010dp-xxhdpi") fun home() = shot("home") { Home(connected()) }
+    @Test @Config(qualifiers = "w400dp-h1260dp-xxhdpi") fun home() = shot("home") { Home(connected()) }
 
-    @Test @Config(qualifiers = "w400dp-h1010dp-night-xxhdpi") fun homeDark() = shot("home-dark", dark = true) { Home(connected()) }
+    @Test @Config(qualifiers = "w400dp-h1260dp-night-xxhdpi") fun homeDark() = shot("home-dark", dark = true) { Home(connected()) }
 
     @Test fun setup() = shot("setup") { Home(UiState(now = now)) }
 
@@ -97,6 +101,7 @@ class ScreenshotTest {
                     tls = true,
                     board = Presence.ONLINE,
                     hosts = mapOf("DESKTOP" to Presence.OFFLINE, "GAMING-PC" to Presence.OFFLINE, "NAS" to Presence.ONLINE),
+                    blocking = true,
                 ),
             ),
             onSave = {},

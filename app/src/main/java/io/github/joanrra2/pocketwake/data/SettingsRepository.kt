@@ -73,7 +73,19 @@ class SettingsRepository(context: Context) {
         id
     }
 
+    /**
+     * Random per-install value that this app's own wake shortcuts carry, so they can wake
+     * without asking; wake requests from other apps or links don't have it.
+     */
+    fun shortcutToken(): String = prefs.getString(K_SHORTCUT_TOKEN, null) ?: run {
+        val bytes = ByteArray(16).also { java.security.SecureRandom().nextBytes(it) }
+        val token = bytes.joinToString("") { "%02x".format(it) }
+        prefs.edit { putString(K_SHORTCUT_TOKEN, token) }
+        token
+    }
+
     private companion object {
+        const val K_SHORTCUT_TOKEN = "shortcut.token"
         const val K_HOST = "broker.host"
         const val K_PORT = "broker.port"
         const val K_TLS = "broker.tls"

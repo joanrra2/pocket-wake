@@ -25,7 +25,7 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = ciRunNumber ?: 1
-        versionName = ciTag ?: "0.1.0-beta"
+        versionName = ciTag ?: "0.2.0-beta"
     }
 
     signingConfigs {

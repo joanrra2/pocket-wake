@@ -49,6 +49,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -66,6 +67,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
@@ -77,6 +81,7 @@ import io.github.joanrra2.pocketwake.core.Topics
 import io.github.joanrra2.pocketwake.core.WAKE_TIMEOUT_MS
 import io.github.joanrra2.pocketwake.core.WakeStatus
 import io.github.joanrra2.pocketwake.mqtt.Connection
+import io.github.joanrra2.pocketwake.shortcut.WakeShortcuts
 import io.github.joanrra2.pocketwake.ui.components.BetaPill
 import io.github.joanrra2.pocketwake.ui.components.InfoRow
 import io.github.joanrra2.pocketwake.ui.components.Mono
@@ -96,6 +101,9 @@ fun HomeScreen(
     onRemoveHost: (String) -> Unit,
     onRetry: () -> Unit,
     onOpenSettings: () -> Unit,
+    onSetBlocking: (Boolean) -> Unit = {},
+    onCancelQueuedWake: () -> Unit = {},
+    onPin: (String) -> Boolean = { false },
 ) {
     val scroll = TopAppBarDefaults.enterAlwaysScrollBehavior()
     val snackbar = remember { SnackbarHostState() }
@@ -157,6 +165,10 @@ fun HomeScreen(
                 return@LazyColumn
             }
             item { ConnectionCard(ui, onRetry, onOpenSettings) }
+            ui.queuedWake?.let { name -> item { QueuedWakeCard(name, onCancelQueuedWake) } }
+            if (ui.blocking.known || ui.stats != null) {
+                item { BoardCard(ui, onSetBlocking) }
+            }
             item {
                 val online = hosts.count { it.presence == Presence.ONLINE }
                 val reporting = hosts.count { it.reportsState }
@@ -191,6 +203,7 @@ fun HomeScreen(
                     onWake = { onWake(host.name) },
                     onDismiss = { onDismissWake(host.name) },
                     onRemove = { onRemoveHost(host.name) },
+                    onPin = { onPin(host.name) },
                     snackbar = snackbar,
                 )
             }
@@ -291,6 +304,104 @@ private fun ConnectionCard(ui: UiState, onRetry: () -> Unit, onOpenSettings: () 
     }
 }
 
+// --- queued wake (opened from a shortcut) ---------------------------------------------------
+
+@Composable
+private fun QueuedWakeCard(name: String, onCancel: () -> Unit) {
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+    ) {
+        Row(Modifier.padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+            Spacer(Modifier.width(12.dp))
+            Text(
+                "Waking $name as soon as the broker connects…",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = onCancel) { Text("Cancel") }
+        }
+    }
+}
+
+// --- ad blocking and stats ---------------------------------------------------------------
+
+@Composable
+private fun BoardCard(ui: UiState, onSetBlocking: (Boolean) -> Unit) {
+    val b = ui.blocking
+    val connected = ui.connection is Connection.Connected
+    var confirmOff by rememberSaveable { mutableStateOf(false) }
+    val subtitle = when {
+        b.shown == null -> "State unknown"
+        !connected -> if (b.shown == true) "On when last seen" else "Off when last seen"
+        b.pending -> "Waiting for the board…"
+        b.shown == true -> "On · ads and trackers are blocked"
+        else -> "Off · devices using the board see ads"
+    }
+    Card(shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+        Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Ad blocking", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (b.shown == false && connected) LocalStatusColors.current.warning else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (b.pending) {
+                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(12.dp))
+                }
+                if (b.known) {
+                    Switch(
+                        checked = b.shown == true,
+                        onCheckedChange = { on -> if (on) onSetBlocking(true) else confirmOff = true },
+                        enabled = connected && !b.pending,
+                        modifier = Modifier.semantics { contentDescription = "Ad blocking" },
+                    )
+                }
+            }
+            b.problem?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            }
+            val st = ui.stats
+            if (st != null) {
+                Spacer(Modifier.height(12.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+                Spacer(Modifier.height(10.dp))
+                InfoRow("Blocked", value = "${Format.count(st.blocked)} of ${Format.count(st.total)} · ${Format.percent(st.percent)}")
+                InfoRow("Blocklist", value = "${Format.count(st.domains)} domains")
+                InfoRow("Devices", value = Format.count(st.clients))
+                Text(
+                    "Since the board restarted · updated ${Format.ago(ui.now, st.at)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            } else if (connected) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "Blocking stats arrive within a minute.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+    if (confirmOff) {
+        AlertDialog(
+            onDismissRequest = { confirmOff = false },
+            title = { Text("Turn off ad blocking?") },
+            text = { Text("Every device that uses the board will see ads and trackers until you turn it back on, here or in the board's web UI.") },
+            confirmButton = { TextButton(onClick = { confirmOff = false; onSetBlocking(false) }) { Text("Turn off") } },
+            dismissButton = { TextButton(onClick = { confirmOff = false }) { Text("Cancel") } },
+        )
+    }
+}
+
 // --- host card ----------------------------------------------------------------------------
 
 @Composable
@@ -302,11 +413,14 @@ private fun HostCard(
     onWake: () -> Unit,
     onDismiss: () -> Unit,
     onRemove: () -> Unit,
+    onPin: () -> Boolean,
     snackbar: SnackbarHostState,
 ) {
     val status = LocalStatusColors.current
     val scope = rememberCoroutineScope()
     val clipboard = LocalClipboard.current
+    val context = LocalContext.current
+    val canPin = remember { WakeShortcuts.canPin(context) }
     var menu by remember { mutableStateOf(false) }
     val busy = host.wake.isBusy
     val online = host.presence == Presence.ONLINE
@@ -373,6 +487,15 @@ private fun HostCard(
                                 }
                             },
                         )
+                        if (canPin) {
+                            DropdownMenuItem(
+                                text = { Text("Add to home screen") },
+                                onClick = {
+                                    menu = false
+                                    if (!onPin()) scope.launch { snackbar.showSnackbar("Your launcher can't add shortcuts") }
+                                },
+                            )
+                        }
                         if (host.manual) {
                             DropdownMenuItem(
                                 text = { Text(if (host.reportsState) "Unpin (keep while the board reports it)" else "Remove") },

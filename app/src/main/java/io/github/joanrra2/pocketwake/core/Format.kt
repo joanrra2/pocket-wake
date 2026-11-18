@@ -16,6 +16,12 @@ object Format {
         }
     }
 
+    /** 139651 -> "139,651" (grouped for [locale]). */
+    fun count(n: Long, locale: Locale = Locale.getDefault()): String = java.text.NumberFormat.getIntegerInstance(locale).format(n)
+
+    /** 30.84 -> "30.8 %". */
+    fun percent(p: Double, locale: Locale = Locale.getDefault()): String = String.format(locale, "%.1f %%", p)
+
     /** "just now", "5 min ago", "3 h ago", "yesterday", "4 days ago". */
     fun ago(now: Long, then: Long): String {
         val d = ((now - then) / 1000).coerceAtLeast(0)

@@ -364,6 +364,28 @@ private fun TestReportCard(r: TestReport, prefix: String) {
                     .joinToString(", ") { (n, p) -> n + if (p == Presence.ONLINE) " (online)" else " (offline)" }
                 ReportLine(Icons.Filled.CheckCircle, status.online, "Found ${r.hosts.size} PC" + if (r.hosts.size == 1) "" else "s", list)
             }
+            r.deniedRequired(prefix).takeIf { it.isNotEmpty() }?.let { d ->
+                ReportLine(
+                    Icons.Filled.Warning,
+                    MaterialTheme.colorScheme.error,
+                    "The broker won't let this login read " + d.joinToString(" and "),
+                    "Add a Client Authorization rule for this login that allows Subscribe on it.",
+                )
+            }
+            when {
+                r.blocking != null -> ReportLine(
+                    Icons.Filled.CheckCircle,
+                    status.online,
+                    "Ad blocking " + if (r.blocking) "on" else "off",
+                    "The home screen shows a switch and the board's stats.",
+                )
+                r.deniedOptional(prefix).isNotEmpty() -> ReportLine(
+                    Icons.Filled.Info,
+                    MaterialTheme.colorScheme.primary,
+                    "Ad-blocking switch not allowed (optional)",
+                    "To see and switch ad blocking here, allow this login Subscribe on $prefix/blocking and $prefix/stats, and Publish on $prefix/blocking/set.",
+                )
+            }
         }
     }
 }
