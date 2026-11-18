@@ -206,7 +206,7 @@ test('parses blocking payloads', () => {
 
 test("parses the board's stats", () => {
   const s = C.parseStats('{"blocked":1834,"allowed":4127,"percent":30.7,"domains":139651,"clients":6}', 5);
-  assert.deepEqual(s, { blocked: 1834, allowed: 4127, total: 5961, percent: 30.7, domains: 139651, clients: 6, at: 5 });
+  assert.deepEqual(s, { blocked: 1834, allowed: 4127, total: 5961, percent: 30.7, domains: 139651, clients: 6, at: 5, uptime: null, restart: null });
   assert.equal(C.parseStats('{"blocked":1,"allowed":3}', 0).percent, 25);
   assert.equal(C.parseStats('{"blocked":0,"allowed":0}', 0).percent, 0);
   assert.equal(C.parseStats('{"percent":3}', 0), null);
@@ -239,4 +239,28 @@ test('unconfirmed blocking change times out with a hint', () => {
 test('formats counts and percentages', () => {
   assert.equal(Format.count(139651, 'en-US'), '139,651');
   assert.equal(Format.percent(30.66), '30.7 %');
+});
+
+test('stats from firmware 0.6 carry uptime and the restart reason', () => {
+  const s = C.parseStats('{"blocked":1,"allowed":3,"uptime":3600,"restart":"power dip (brownout)"}', 1000);
+  assert.equal(s.uptime, 3600);
+  assert.equal(s.restart, 'power dip (brownout)');
+  assert.equal(C.statsUptime(s, 1000 + 90_000), 3690);
+  assert.equal(C.unexpectedRestart(s), true);
+  assert.equal(C.unexpectedRestart(C.parseStats('{"blocked":1,"allowed":3,"restart":"firmware update"}', 0)), false);
+  const old = C.parseStats('{"blocked":1,"allowed":3}', 0);
+  assert.equal(old.uptime, null);
+  assert.equal(old.restart, null);
+  assert.equal(C.statsUptime(old, 5000), null);
+  assert.equal(C.parseStats('{"blocked":1,"allowed":3,"uptime":-4,"restart":"  "}', 0).uptime, null);
+  assert.equal(C.parseStats('{"blocked":1,"allowed":3,"restart":"  "}', 0).restart, null);
+});
+
+test('formats board uptime', () => {
+  assert.equal(Format.uptime(45), '45 s');
+  assert.equal(Format.uptime(754), '12 min');
+  assert.equal(Format.uptime(7200), '2 h');
+  assert.equal(Format.uptime(11_520), '3 h 12 min');
+  assert.equal(Format.uptime(86_400), '1 d');
+  assert.equal(Format.uptime(367_200), '4 d 6 h');
 });

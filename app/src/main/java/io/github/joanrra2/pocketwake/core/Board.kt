@@ -4,8 +4,8 @@ package io.github.joanrra2.pocketwake.core
 const val BLOCKING_CONFIRM_MS = 10_000L
 
 /**
- * `<prefix>/stats` from the board's MQTT bridge, published every 60 s (not retained).
- * Counters run since the board last restarted.
+ * `<prefix>/stats` from the board's MQTT bridge, published every 60 s.
+ * Counters run since the board last restarted. Firmware 0.6 adds [uptime] and [restart].
  */
 data class BoardStats(
     val blocked: Long,
@@ -18,14 +18,37 @@ data class BoardStats(
     val clients: Long,
     /** When this phone received it. */
     val at: Long,
+    /** Seconds since the board booted, when [at] was received; null on older firmware. */
+    val uptime: Long? = null,
+    /** Why the board last restarted ("power on", "crash", "watchdog"…); null on older firmware. */
+    val restart: String? = null,
 ) {
     val total: Long get() = blocked + allowed
 
+    /** Uptime now, counting the time since the message arrived. */
+    fun uptimeAt(now: Long): Long? = uptime?.let { it + ((now - at) / 1000).coerceAtLeast(0) }
+
+    /** The last restart wasn't asked for: a crash, the watchdog or a power dip. */
+    val unexpectedRestart: Boolean
+        get() = restart?.lowercase()?.let { r -> UNEXPECTED.any { it in r } } ?: false
+
     companion object {
+        private val UNEXPECTED = listOf("crash", "watchdog", "brownout", "panic")
+
+        private fun str(json: String, key: String): String? =
+            Regex("\"" + Regex.escape(key) + "\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"").find(json)?.groupValues?.get(1)
+                ?.replace(Regex("\\\\(.)"), "$1")
+                ?.trim()
+                ?.take(60)
+                ?.takeIf { it.isNotEmpty() }
+
         private fun num(json: String, key: String): String? =
             Regex("\"" + Regex.escape(key) + "\"\\s*:\\s*(-?\\d+(?:\\.\\d+)?)").find(json)?.groupValues?.get(1)
 
-        /** Parses `{"blocked":1,"allowed":2,"percent":33.3,"domains":4,"clients":5}`; null if blocked/allowed are missing. */
+        /**
+         * Parses `{"blocked":1,"allowed":2,"percent":33.3,"domains":4,"clients":5,"uptime":60,"restart":"power on"}`;
+         * null if blocked/allowed are missing. The rest is optional.
+         */
         fun parse(json: String, at: Long): BoardStats? {
             val blocked = num(json, "blocked")?.toDoubleOrNull()?.toLong() ?: return null
             val allowed = num(json, "allowed")?.toDoubleOrNull()?.toLong() ?: return null
@@ -37,6 +60,8 @@ data class BoardStats(
                 domains = num(json, "domains")?.toDoubleOrNull()?.toLong() ?: 0,
                 clients = num(json, "clients")?.toDoubleOrNull()?.toLong() ?: 0,
                 at = at,
+                uptime = num(json, "uptime")?.toDoubleOrNull()?.toLong()?.takeIf { it >= 0 },
+                restart = str(json, "restart"),
             )
         }
     }

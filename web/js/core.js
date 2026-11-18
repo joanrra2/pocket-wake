@@ -71,7 +71,7 @@ export function parseBlocking(payload) {
 }
 
 /**
- * `{"blocked":1,"allowed":2,"percent":33.3,"domains":4,"clients":5}` (every 60 s, counters
+ * `{"blocked":1,"allowed":2,"percent":33.3,"domains":4,"clients":5,"uptime":60,"restart":"power on"}` (every 60 s, counters
  * since the board restarted) -> stats object, or null when blocked/allowed are missing.
  */
 export function parseStats(payload, at) {
@@ -88,8 +88,17 @@ export function parseStats(payload, at) {
     domains: n(o.domains) ?? 0,
     clients: n(o.clients) ?? 0,
     at,
+    // Firmware 0.6+: seconds since boot (when received) and why the board last restarted.
+    uptime: n(o.uptime) !== null && o.uptime >= 0 ? Math.floor(o.uptime) : null,
+    restart: typeof o.restart === 'string' && o.restart.trim() ? o.restart.trim().slice(0, 60) : null,
   };
 }
+
+/** Uptime now, counting the time since the stats arrived; null on older firmware. */
+export const statsUptime = (st, now) => (st.uptime === null ? null : st.uptime + Math.max(0, Math.floor((now - st.at) / 1000)));
+
+/** The last restart wasn't asked for: a crash, the watchdog or a power dip. */
+export const unexpectedRestart = (st) => !!st.restart && /crash|watchdog|brownout|panic/i.test(st.restart);
 
 // The switch: { on: true|false|null (never seen), requested: value asked for until the
 // board confirms, requestedAt, problem: why the last change didn't go through }.
@@ -361,6 +370,16 @@ export const Format = {
 
   /** 30.66 -> "30.7 %". */
   percent: (p) => `${Number(p).toFixed(1)} %`,
+
+  /** Board uptime: 45 -> "45 s", 754 -> "12 min", 11520 -> "3 h 12 min", 367200 -> "4 d 6 h". */
+  uptime(total) {
+    const s = Math.max(0, Math.floor(total));
+    const m = Math.floor(s / 60), h = Math.floor(s / 3600), d = Math.floor(s / 86400);
+    if (s < 60) return `${s} s`;
+    if (s < 3600) return `${m} min`;
+    if (s < 86400) return m % 60 ? `${h} h ${m % 60} min` : `${h} h`;
+    return h % 24 ? `${d} d ${h % 24} h` : `${d} d`;
+  },
 
   /** 7 -> "7 s", 65 -> "1 min 5 s", 120 -> "2 min". */
   seconds(total) {

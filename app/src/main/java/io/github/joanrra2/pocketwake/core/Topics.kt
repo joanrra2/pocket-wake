@@ -8,7 +8,7 @@ package io.github.joanrra2.pocketwake.core
  *   <prefix>/wol/<name>/set      any payload wakes <name> (check, wake, verify)
  *   <prefix>/blocking            ON / OFF (retained), ad blocking
  *   <prefix>/blocking/set        ON / OFF turns ad blocking on or off
- *   <prefix>/stats               JSON every 60 s: blocked, allowed, percent, domains, clients
+ *   <prefix>/stats               JSON every 60 s: blocked, allowed, percent, domains, clients (+ uptime, restart)
  *
  * Host names are case-sensitive and used verbatim as one topic level.
  */

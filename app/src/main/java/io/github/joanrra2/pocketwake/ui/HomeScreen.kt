@@ -375,6 +375,14 @@ private fun BoardCard(ui: UiState, onSetBlocking: (Boolean) -> Unit) {
                 InfoRow("Blocked", value = "${Format.count(st.blocked)} of ${Format.count(st.total)} · ${Format.percent(st.percent)}")
                 InfoRow("Blocklist", value = "${Format.count(st.domains)} domains")
                 InfoRow("Devices", value = Format.count(st.clients))
+                st.uptimeAt(ui.now)?.let { InfoRow("Up for", value = Format.uptime(it)) }
+                st.restart?.let { why ->
+                    InfoRow(
+                        "Last restart",
+                        leading = if (st.unexpectedRestart) ({ StatusDot(LocalStatusColors.current.warning, size = 8.dp) }) else null,
+                        value = Format.sentence(why),
+                    )
+                }
                 Text(
                     "Since the board restarted · updated ${Format.ago(ui.now, st.at)}",
                     style = MaterialTheme.typography.bodySmall,

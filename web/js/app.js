@@ -4,7 +4,7 @@ import * as C from './core.js';
 import * as Store from './store.js';
 import { openSession, testConnection } from './broker.js';
 
-const VERSION = '0.2.0-beta';
+const VERSION = '0.2.1-beta';
 const { Topics, Format } = C;
 
 const state = {
@@ -360,6 +360,8 @@ function boardCard() {
       <span class="k">Blocked</span><span class="v">${Format.count(st.blocked)} of ${Format.count(st.total)} · ${Format.percent(st.percent)}</span>
       <span class="k">Blocklist</span><span class="v">${Format.count(st.domains)} domains</span>
       <span class="k">Devices</span><span class="v">${Format.count(st.clients)}</span>
+      ${st.uptime !== null ? `<span class="k">Up for</span><span class="v">${Format.uptime(C.statsUptime(st, state.now))}</span>` : ''}
+      ${st.restart ? `<span class="k">Last restart</span><span class="v${C.unexpectedRestart(st) ? ' warn-c' : ''}">${esc(st.restart.charAt(0).toUpperCase() + st.restart.slice(1))}</span>` : ''}
     </div>
     <p class="muted small mt8">Since the board restarted · updated ${Format.ago(state.now, st.at)}</p>`
     : on ? '<p class="muted small mt8">Blocking stats arrive within a minute.</p>' : '';
