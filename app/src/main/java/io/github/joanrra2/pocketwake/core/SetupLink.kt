@@ -80,6 +80,7 @@ data class SetupLink(
         }
 
         private fun decode(s: String): String =
-            runCatching { URLDecoder.decode(s, Charsets.UTF_8) }.getOrDefault(s)
+            // The String-charset overload: decode(String, Charset) needs API 33 (minSdk is 26).
+            runCatching { URLDecoder.decode(s, "UTF-8") }.getOrDefault(s)
     }
 }

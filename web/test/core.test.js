@@ -185,3 +185,58 @@ test('a setup link fills the web profile but never a password', () => {
   const kept = C.applySetupLink({ ...C.defaultProfile(), host: 'old.example', username: 'phone', password: 'secret' }, same);
   assert.deepEqual([kept.port, kept.path, kept.username, kept.password, kept.prefix], [8084, '/mqtt', 'phone', 'secret', 'other']);
 });
+
+// --- ad blocking and stats ----------------------------------------------------------------
+
+test('blocking and stats topics', () => {
+  assert.equal(Topics.blocking('sinkhole'), 'sinkhole/blocking');
+  assert.equal(Topics.blockingSet('sinkhole'), 'sinkhole/blocking/set');
+  assert.equal(Topics.stats('home/sinkhole'), 'home/sinkhole/stats');
+  assert.deepEqual(Topics.filters('sinkhole'), ['sinkhole/status', 'sinkhole/wol/+/state', 'sinkhole/blocking', 'sinkhole/stats']);
+});
+
+test('parses blocking payloads', () => {
+  assert.equal(C.parseBlocking('ON'), true);
+  assert.equal(C.parseBlocking(' on\n'), true);
+  assert.equal(C.parseBlocking('OFF'), false);
+  assert.equal(C.parseBlocking('0'), false);
+  assert.equal(C.parseBlocking(''), null);
+  assert.equal(C.parseBlocking('paused'), null);
+});
+
+test("parses the board's stats", () => {
+  const s = C.parseStats('{"blocked":1834,"allowed":4127,"percent":30.7,"domains":139651,"clients":6}', 5);
+  assert.deepEqual(s, { blocked: 1834, allowed: 4127, total: 5961, percent: 30.7, domains: 139651, clients: 6, at: 5 });
+  assert.equal(C.parseStats('{"blocked":1,"allowed":3}', 0).percent, 25);
+  assert.equal(C.parseStats('{"blocked":0,"allowed":0}', 0).percent, 0);
+  assert.equal(C.parseStats('{"percent":3}', 0), null);
+  assert.equal(C.parseStats('garbage', 0), null);
+  assert.equal(C.parseStats('null', 0), null);
+});
+
+test('switch shows the request until the board confirms it', () => {
+  let b = C.blockingReported(C.newBlocking(), true);
+  b = C.blockingRequested(b, false, 1000);
+  assert.equal(C.blockingShown(b), false);
+  b = C.blockingReported(b, true); // periodic refresh with the old value
+  assert.equal(b.requested, false);
+  b = C.blockingReported(b, false);
+  assert.equal(b.requested, null);
+  assert.equal(b.on, false);
+  assert.equal(b.problem, null);
+});
+
+test('unconfirmed blocking change times out with a hint', () => {
+  const b = C.blockingRequested({ ...C.newBlocking(), on: true }, false, 0);
+  assert.equal(C.blockingTick(b, C.BLOCKING_CONFIRM_MS - 1, 'sinkhole/blocking/set'), b);
+  const t = C.blockingTick(b, C.BLOCKING_CONFIRM_MS, 'sinkhole/blocking/set');
+  assert.equal(t.requested, null);
+  assert.equal(C.blockingShown(t), true);
+  assert.match(t.problem, /sinkhole\/blocking\/set/);
+  assert.equal(C.blockingRequested(t, true, 0).problem, null);
+});
+
+test('formats counts and percentages', () => {
+  assert.equal(Format.count(139651, 'en-US'), '139,651');
+  assert.equal(Format.percent(30.66), '30.7 %');
+});

@@ -36,8 +36,16 @@ home network, checks that the PC answers, and the app shows **Online after 23 s*
   "Online after N s", "Already online", "Magic packet sent" (PCs the board can't check),
   or a hint when nothing answers after 3 minutes.
 - **Last wake** per PC ("Last woken yesterday · online after 41 s"), kept on the phone.
-- **Test connection** in settings checks the login and TLS, whether the board is online
-  and lists the PCs it reports, before you save.
+- **Ad blocking** card: an on/off switch for the board's blocking (turning it off asks
+  first) and its stats (queries blocked, blocklist size, devices), updated every minute.
+  It appears only when the phone's broker login may read `<prefix>/blocking`; see
+  [the optional rules](docs/SETUP.md#2-create-the-mqtt-broker).
+- **Wake shortcuts** (Android): long-press the app icon for the last woken PCs, or
+  *⋮ → Add to home screen* on a PC for its own icon. A shortcut opens the app and wakes
+  the PC as soon as the broker connects.
+- **Test connection** in settings checks the login and TLS, whether the board is online,
+  lists the PCs it reports, and says which topics the broker's access rules refuse,
+  before you save.
 
 ## Privacy and permissions
 
@@ -80,6 +88,21 @@ In short:
 | `<prefix>/wol/<name>/set` | app → board | `1` (any payload wakes `<name>`; QoS 1, not retained) |
 | `<prefix>/wol/<name>/state` | board → app | `online` / `offline` (retained; only PCs with an IP) |
 | `<prefix>/status` | board → app | `online` / `offline` (retained, last will) |
+| `<prefix>/blocking` | board → app | `ON` / `OFF` (retained), ad blocking |
+| `<prefix>/blocking/set` | app → board | `ON` / `OFF` (QoS 1, not retained) |
+| `<prefix>/stats` | board → app | JSON every 60 s: `blocked`, `allowed`, `percent`, `domains`, `clients` |
+
+The last three are optional: without them the app simply hides the ad-blocking card.
+
+### Automation (Android)
+
+Other apps can ask Pocket Wake to wake a PC; it always asks you to confirm first:
+
+- Intent action `io.github.joanrra2.pocketwake.WAKE` with the string extra `name`
+  (Tasker: *Send Intent*, target *Activity*), or
+- a link such as `pocketwake://wake/OFFICE-PC` (NFC tags, buttons in other apps).
+
+Only the app's own shortcuts wake without asking.
 
 Problems? See [Troubleshooting](docs/SETUP.md#troubleshooting).
 

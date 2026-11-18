@@ -4,6 +4,8 @@
 export const DEFAULT_PREFIX = 'sinkhole';
 export const MAX_NAME_LENGTH = 64;
 export const WAKE_TIMEOUT_MS = 3 * 60 * 1000;
+/** How long the blocking switch waits for the board to confirm a change. */
+export const BLOCKING_CONFIRM_MS = 10_000;
 
 // --- topics -------------------------------------------------------------------------
 
@@ -31,6 +33,12 @@ export const Topics = {
   stateFilter: (p) => `${p}/wol/+/state`,
   state: (p, name) => `${p}/wol/${name}/state`,
   set: (p, name) => `${p}/wol/${name}/set`,
+  blocking: (p) => `${p}/blocking`,
+  blockingSet: (p) => `${p}/blocking/set`,
+  stats: (p) => `${p}/stats`,
+
+  /** Everything the app reads. Wake and blocking topics are only written. */
+  filters: (p) => [`${p}/status`, `${p}/wol/+/state`, `${p}/blocking`, `${p}/stats`],
 
   /** Host name from `<prefix>/wol/<name>/state`, or null. */
   hostFromState(prefix, topic) {
@@ -51,6 +59,54 @@ export const Topics = {
     return null;
   },
 };
+
+// --- ad blocking and stats (<prefix>/blocking, <prefix>/stats) -------------------------
+
+/** "ON"/"OFF" as the board publishes them -> true/false; anything else -> null (ignored). */
+export function parseBlocking(payload) {
+  const v = String(payload ?? '').trim().toUpperCase();
+  if (['ON', '1', 'TRUE'].includes(v)) return true;
+  if (['OFF', '0', 'FALSE'].includes(v)) return false;
+  return null;
+}
+
+/**
+ * `{"blocked":1,"allowed":2,"percent":33.3,"domains":4,"clients":5}` (every 60 s, counters
+ * since the board restarted) -> stats object, or null when blocked/allowed are missing.
+ */
+export function parseStats(payload, at) {
+  let o;
+  try { o = JSON.parse(payload); } catch { return null; }
+  const n = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+  if (!o || n(o.blocked) === null || n(o.allowed) === null) return null;
+  const total = o.blocked + o.allowed;
+  return {
+    blocked: o.blocked,
+    allowed: o.allowed,
+    total,
+    percent: n(o.percent) ?? (total ? (o.blocked * 100) / total : 0),
+    domains: n(o.domains) ?? 0,
+    clients: n(o.clients) ?? 0,
+    at,
+  };
+}
+
+// The switch: { on: true|false|null (never seen), requested: value asked for until the
+// board confirms, requestedAt, problem: why the last change didn't go through }.
+export const newBlocking = () => ({ on: null, requested: null, requestedAt: 0, problem: null });
+export const blockingShown = (b) => b.requested ?? b.on;
+
+export function blockingReported(b, value) {
+  return b.requested === value ? { ...b, on: value, requested: null, problem: null } : { ...b, on: value };
+}
+export const blockingRequested = (b, value, now) => ({ ...b, requested: value, requestedAt: now, problem: null });
+export const blockingFailed = (b, reason) => ({ ...b, requested: null, problem: reason });
+
+/** Gives up waiting after BLOCKING_CONFIRM_MS. Returns the same object when nothing changed. */
+export function blockingTick(b, now, setTopic) {
+  if (b.requested === null || now - b.requestedAt < BLOCKING_CONFIRM_MS) return b;
+  return blockingFailed(b, `The board didn't confirm. The broker login may not be allowed to publish ${setTopic}.`);
+}
 
 // --- broker profile -------------------------------------------------------------------
 
@@ -300,6 +356,12 @@ export function dismissWake(book, name) {
 // --- formatting -----------------------------------------------------------------------
 
 export const Format = {
+  /** 139651 -> "139,651" (grouped for the browser's language, or [locale]). */
+  count: (n, locale) => new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(n),
+
+  /** 30.66 -> "30.7 %". */
+  percent: (p) => `${Number(p).toFixed(1)} %`,
+
   /** 7 -> "7 s", 65 -> "1 min 5 s", 120 -> "2 min". */
   seconds(total) {
     const s = Math.max(0, Math.floor(total));

@@ -347,3 +347,13 @@ dialog h2 { margin: 0 0 16px; font-size: 22px; font-weight: 500; }
 p.err-c, span.err-c { color: var(--error); }
 .hero-avatar { background: var(--primary); color: var(--on-primary); }
 .hero-title { font-size: 26px; font-weight: 500; margin: 16px 0 8px; }
+
+/* Ad-blocking switch (Material 3 look) */
+.switch { position: relative; flex: none; width: 52px; height: 32px; padding: 0; border-radius: 16px; cursor: pointer;
+  border: 2px solid var(--outline); background: var(--surface-highest); transition: background .15s, border-color .15s; }
+.switch > i { position: absolute; top: 50%; left: 6px; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--outline); transform: translateY(-50%); transition: left .15s, width .15s, height .15s, background .15s; }
+.switch[aria-checked="true"] { background: var(--primary); border-color: var(--primary); }
+.switch[aria-checked="true"] > i { left: 22px; width: 24px; height: 24px; background: var(--on-primary); }
+.switch:disabled { opacity: .38; cursor: default; }
+.switch:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }

@@ -6,6 +6,9 @@ package io.github.joanrra2.pocketwake.core
  *   <prefix>/status              online / offline (retained, last will)
  *   <prefix>/wol/<name>/state    online / offline (retained, only hosts with an IP)
  *   <prefix>/wol/<name>/set      any payload wakes <name> (check, wake, verify)
+ *   <prefix>/blocking            ON / OFF (retained), ad blocking
+ *   <prefix>/blocking/set        ON / OFF turns ad blocking on or off
+ *   <prefix>/stats               JSON every 60 s: blocked, allowed, percent, domains, clients
  *
  * Host names are case-sensitive and used verbatim as one topic level.
  */
@@ -38,6 +41,12 @@ object Topics {
     fun stateFilter(prefix: String) = "$prefix/wol/+/state"
     fun stateTopic(prefix: String, name: String) = "$prefix/wol/$name/state"
     fun setTopic(prefix: String, name: String) = "$prefix/wol/$name/set"
+    fun blockingTopic(prefix: String) = "$prefix/blocking"
+    fun blockingSetTopic(prefix: String) = "$prefix/blocking/set"
+    fun statsTopic(prefix: String) = "$prefix/stats"
+
+    /** Everything the app reads. Wake and blocking topics are only written. */
+    fun filters(prefix: String) = listOf(statusTopic(prefix), stateFilter(prefix), blockingTopic(prefix), statsTopic(prefix))
 
     /** Host name from `<prefix>/wol/<name>/state`, or null when [topic] is something else. */
     fun hostFromStateTopic(prefix: String, topic: String): String? {

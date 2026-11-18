@@ -4,7 +4,7 @@ import * as C from './core.js';
 import * as Store from './store.js';
 import { openSession, testConnection } from './broker.js';
 
-const VERSION = '0.1.0-beta';
+const VERSION = '0.2.0-beta';
 const { Topics, Format } = C;
 
 const state = {
@@ -13,6 +13,8 @@ const state = {
   passwordLost: false,
   conn: { kind: 'idle' },
   board: { presence: 'unknown', since: null },
+  blocking: C.newBlocking(),
+  stats: null,
   book: {},
   lastMessageAt: null,
   now: Date.now(),
@@ -64,7 +66,7 @@ function connect() {
   session = openSession(
     p,
     Store.clientId(),
-    [Topics.status(p.prefix), Topics.stateFilter(p.prefix)],
+    Topics.filters(p.prefix),
     (conn) => { state.conn = conn; render(); },
     (m) => onMessage(p.prefix, m),
   );
@@ -81,6 +83,20 @@ function disconnect() {
 
 function onMessage(prefix, m) {
   const now = Date.now();
+  if (m.topic === Topics.blocking(prefix) || m.topic === Topics.stats(prefix)) {
+    if (m.topic === Topics.blocking(prefix)) {
+      const on = C.parseBlocking(m.payload);
+      if (on === null) return;
+      state.blocking = C.blockingReported(state.blocking, on);
+    } else {
+      const stats = C.parseStats(m.payload, now);
+      if (!stats) return;
+      state.stats = stats;
+    }
+    state.lastMessageAt = now;
+    render();
+    return;
+  }
   const presence = Topics.parsePresence(m.payload);
   if (!presence) return;
   if (m.topic === Topics.status(prefix)) {
@@ -116,9 +132,10 @@ function scheduleTick() {
     state.now = Date.now();
     const next = C.onTick(state.book, state.now);
     if (next !== state.book) { setBook(next); persistLastWakes(); }
+    state.blocking = C.blockingTick(state.blocking, state.now, Topics.blockingSet(state.profile.prefix));
     if (state.view === 'home') render();
     scheduleTick();
-  }, C.anyBusy(state.book) ? 1000 : 15000);
+  }, C.anyBusy(state.book) || state.blocking.requested !== null ? 1000 : 15000);
 }
 
 function persistLastWakes() {
@@ -141,6 +158,20 @@ async function wake(name) {
     setBook(C.onWakeFailed(state.book, name, e.message || 'Not connected', Date.now()));
   }
   persistLastWakes();
+  render();
+}
+
+async function setBlocking(on) {
+  if (!session) return;
+  if (!on && !confirm("Turn off ad blocking?\n\nEvery device that uses the board will see ads and trackers until you turn it back on, here or in the board's web UI.")) return;
+  state.blocking = C.blockingRequested(state.blocking, on, Date.now());
+  render();
+  scheduleTick();
+  try {
+    await session.publish(Topics.blockingSet(state.profile.prefix), on ? 'ON' : 'OFF');
+  } catch (e) {
+    state.blocking = C.blockingFailed(state.blocking, e.message || 'Not connected');
+  }
   render();
 }
 
@@ -177,7 +208,12 @@ async function saveSettings() {
   state.profile = n;
   state.remember = remember;
   state.passwordLost = false;
-  if (brokerChanged) { setBook(C.forgetDiscovered(state.book)); state.board = { presence: 'unknown', since: null }; }
+  if (brokerChanged) {
+    setBook(C.forgetDiscovered(state.book));
+    state.board = { presence: 'unknown', since: null };
+    state.blocking = C.newBlocking();
+    state.stats = null;
+  }
   state.testReport = null;
   go('home');
   connect();
@@ -257,6 +293,7 @@ function renderHome() {
     ${!configured() ? setupCard() : `
       ${installHint()}
       ${connectionCard()}
+      ${state.blocking.on !== null || state.stats ? boardCard() : ''}
       <div class="section"><h3>Computers</h3><span class="count">${esc(count)}</span></div>
       ${hosts.length ? hosts.map(hostCard).join('') : emptyCard()}
       ${hosts.length ? '<p class="muted small m4">PCs with an IP on the board appear automatically. Names are case-sensitive.</p>' : ''}
@@ -302,6 +339,44 @@ function connectionCard() {
       ${state.lastMessageAt ? `<span class="k">Last update</span><span class="v">${Format.ago(now, state.lastMessageAt)}</span>` : ''}
     </div>
     ${c.kind === 'connected' && board.presence === 'offline' ? '<p class="small err-c mt8">The board is offline, so wake requests wait until it reconnects.</p>' : ''}
+  </section>`;
+}
+
+function boardCard() {
+  const b = state.blocking;
+  const on = connected();
+  const shown = C.blockingShown(b);
+  const pending = b.requested !== null;
+  let sub = 'State unknown';
+  if (shown !== null) {
+    if (!on) sub = shown ? 'On when last seen' : 'Off when last seen';
+    else if (pending) sub = 'Waiting for the board…';
+    else sub = shown ? 'On · ads and trackers are blocked' : 'Off · devices using the board see ads';
+  }
+  const st = state.stats;
+  const stats = st ? `
+    <div class="divider"></div>
+    <div class="info">
+      <span class="k">Blocked</span><span class="v">${Format.count(st.blocked)} of ${Format.count(st.total)} · ${Format.percent(st.percent)}</span>
+      <span class="k">Blocklist</span><span class="v">${Format.count(st.domains)} domains</span>
+      <span class="k">Devices</span><span class="v">${Format.count(st.clients)}</span>
+    </div>
+    <p class="muted small mt8">Since the board restarted · updated ${Format.ago(state.now, st.at)}</p>`
+    : on ? '<p class="muted small mt8">Blocking stats arrive within a minute.</p>' : '';
+  const sw = b.on === null ? '' : `<button class="switch" role="switch" aria-checked="${shown === true}" aria-label="Ad blocking"
+      data-action="blocking" data-on="${shown === true ? 'off' : 'on'}" ${on && !pending ? '' : 'disabled'}><i></i></button>`;
+  return `
+  <section class="card">
+    <div class="row">
+      <div class="grow">
+        <div class="status-title">Ad blocking</div>
+        <div class="small ${shown === false && on ? 'warn-c' : 'muted'}">${esc(sub)}</div>
+      </div>
+      ${pending ? '<span class="spinner"></span>' : ''}
+      ${sw}
+    </div>
+    ${b.problem ? `<p class="small err-c mt8">${esc(b.problem)}</p>` : ''}
+    ${stats}
   </section>`;
 }
 
@@ -495,7 +570,8 @@ function renderSettingsDynamic() {
   if (!f) return;
   const prefix = Topics.normalizePrefix(f.elements.prefix.value) || '<prefix>';
   document.getElementById('topics').innerHTML =
-    `<div>wake    ${esc(prefix)}/wol/&lt;PC&gt;/set</div><div>state   ${esc(prefix)}/wol/+/state</div><div>board   ${esc(prefix)}/status</div>`;
+    `<div>wake    ${esc(prefix)}/wol/&lt;PC&gt;/set</div><div>state   ${esc(prefix)}/wol/+/state</div><div>board   ${esc(prefix)}/status</div>` +
+    `<div class="muted">optional, for the ad-blocking card:</div><div>read    ${esc(prefix)}/blocking, ${esc(prefix)}/stats</div><div>switch  ${esc(prefix)}/blocking/set</div>`;
   const btn = document.getElementById('test-btn');
   btn.disabled = state.testing;
   btn.innerHTML = state.testing ? '<span class="spinner"></span>Testing…' : 'Test connection';
@@ -516,6 +592,12 @@ function reportCard(r) {
   const names = Object.keys(r.hosts).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
   if (!names.length) parts.push(line('info', 'pri-c', 'No PCs reported', 'PCs without an IP on the board can be added by name.'));
   else parts.push(line('check', 'ok-c', `Found ${names.length} PC${names.length === 1 ? '' : 's'}`, names.map((n) => `${n} (${r.hosts[n]})`).join(', ')));
+  const denied = r.denied || [];
+  const required = denied.filter((f) => f === Topics.status(r.prefix) || f === Topics.stateFilter(r.prefix));
+  const optional = denied.filter((f) => f === Topics.blocking(r.prefix) || f === Topics.stats(r.prefix));
+  if (required.length) parts.push(line('warn', 'err-c', `The broker won't let this login read ${required.join(' and ')}`, 'Add a Client Authorization rule for this login that allows Subscribe on it.'));
+  if (r.blocking === true || r.blocking === false) parts.push(line('check', 'ok-c', `Ad blocking ${r.blocking ? 'on' : 'off'}`, "The home screen shows a switch and the board's stats."));
+  else if (optional.length) parts.push(line('info', 'pri-c', 'Ad-blocking switch not allowed (optional)', `To see and switch ad blocking here, allow this login Subscribe on ${r.prefix}/blocking and ${r.prefix}/stats, and Publish on ${r.prefix}/blocking/set.`));
   return `<section class="card high report mt16">${parts.join('')}</section>`;
 }
 
@@ -533,6 +615,7 @@ app.addEventListener('click', async (e) => {
     case 'home': state.testReport = null; go('home'); break;
     case 'retry': connect(); render(); break;
     case 'wake': wake(name); break;
+    case 'blocking': setBlocking(el.dataset.on === 'on'); break;
     case 'dismiss': setBook(C.dismissWake(state.book, name)); render(); break;
     case 'menu': state.menuFor = state.menuFor === name ? null : name; render(); break;
     case 'copy': {
@@ -559,7 +642,7 @@ app.addEventListener('click', async (e) => {
         disconnect();
         await Store.forgetAll();
         savedLastWakes = {};
-        Object.assign(state, { profile: C.defaultProfile(), book: {}, board: { presence: 'unknown', since: null }, testReport: null, passwordLost: false, lastMessageAt: null });
+        Object.assign(state, { profile: C.defaultProfile(), book: {}, board: { presence: 'unknown', since: null }, blocking: C.newBlocking(), stats: null, testReport: null, passwordLost: false, lastMessageAt: null });
         go('settings');
         toast('Saved settings erased');
       }

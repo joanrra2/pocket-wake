@@ -6,6 +6,8 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.viewModelScope
+import io.github.joanrra2.pocketwake.core.BoardStats
+import io.github.joanrra2.pocketwake.core.Blocking
 import io.github.joanrra2.pocketwake.core.HostBook
 import io.github.joanrra2.pocketwake.core.Presence
 import io.github.joanrra2.pocketwake.core.Profile
@@ -16,16 +18,19 @@ import io.github.joanrra2.pocketwake.mqtt.Connection
 import io.github.joanrra2.pocketwake.mqtt.ConnectionTest
 import io.github.joanrra2.pocketwake.mqtt.Message
 import io.github.joanrra2.pocketwake.mqtt.TestReport
+import io.github.joanrra2.pocketwake.shortcut.WakeShortcuts
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** Retained `<prefix>/status` of the board. */
 data class BoardState(val presence: Presence = Presence.UNKNOWN, val since: Long? = null)
@@ -40,6 +45,12 @@ data class UiState(
     val now: Long = System.currentTimeMillis(),
     val testing: Boolean = false,
     val testReport: TestReport? = null,
+    /** `<prefix>/blocking`, unknown until the board's retained state arrives. */
+    val blocking: Blocking = Blocking(),
+    /** Last `<prefix>/stats` (every 60 s). */
+    val stats: BoardStats? = null,
+    /** A PC to wake as soon as the broker connects (from a shortcut or another app). */
+    val queuedWake: String? = null,
 )
 
 /**
@@ -55,7 +66,9 @@ class WakeViewModel(app: Application) : AndroidViewModel(app), DefaultLifecycleO
     private var session: BrokerSession? = null
     private var sessionJob: Job? = null
     private var tickJob: Job? = null
+    private var queuedJob: Job? = null
     private var foreground = false
+    val shortcutToken: String get() = repo.shortcutToken()
 
     init {
         val profile = repo.loadProfile()
@@ -92,7 +105,7 @@ class WakeViewModel(app: Application) : AndroidViewModel(app), DefaultLifecycleO
         val s = BrokerSession(
             profile = profile,
             clientId = repo.clientId(),
-            filters = listOf(Topics.statusTopic(prefix), Topics.stateFilter(prefix)),
+            filters = Topics.filters(prefix),
             onMessage = { onMessage(prefix, it) },
         )
         session = s
@@ -117,6 +130,18 @@ class WakeViewModel(app: Application) : AndroidViewModel(app), DefaultLifecycleO
 
     private fun onMessage(prefix: String, m: Message) {
         val now = System.currentTimeMillis()
+        when (m.topic) {
+            Topics.blockingTopic(prefix) -> {
+                val on = Blocking.parse(m.payload) ?: return
+                _ui.update { it.copy(blocking = it.blocking.onReported(on), lastMessageAt = now) }
+                return
+            }
+            Topics.statsTopic(prefix) -> {
+                val stats = BoardStats.parse(m.payload, now) ?: return
+                _ui.update { it.copy(stats = stats, lastMessageAt = now) }
+                return
+            }
+        }
         val presence = Topics.parsePresence(m.payload) ?: return
         if (m.topic == Topics.statusTopic(prefix)) {
             _ui.update { s ->
@@ -139,6 +164,7 @@ class WakeViewModel(app: Application) : AndroidViewModel(app), DefaultLifecycleO
     fun wake(name: String) {
         val s = session ?: return
         val prefix = _ui.value.profile.prefix
+        WakeShortcuts.onWoken(getApplication(), name, repo.shortcutToken())
         _ui.update { it.copy(book = it.book.onWakeRequested(name, System.currentTimeMillis())) }
         viewModelScope.launch {
             try {
@@ -154,6 +180,53 @@ class WakeViewModel(app: Application) : AndroidViewModel(app), DefaultLifecycleO
 
     fun dismissWake(name: String) = _ui.update { it.copy(book = it.book.dismissWake(name)) }
 
+    /**
+     * Wakes [name] once connected (the app was just opened from a shortcut). Waits briefly
+     * for the retained PC states, so a PC the board reports isn't mistaken for an unknown one.
+     */
+    fun wakeWhenReady(name: String) {
+        queuedJob?.cancel()
+        _ui.update { it.copy(queuedWake = name) }
+        queuedJob = viewModelScope.launch {
+            val c = withTimeoutOrNull(QUEUE_TIMEOUT_MS) {
+                ui.first { it.connection is Connection.Connected || it.connection is Connection.Failed }.connection
+            }
+            if (c !is Connection.Connected) {
+                val now = System.currentTimeMillis()
+                val reason = (c as? Connection.Failed)?.reason ?: "Couldn't connect to the broker in time"
+                _ui.update { it.copy(queuedWake = null, book = it.book.onWakeRequested(name, now).onWakeFailed(name, reason, now)) }
+                return@launch
+            }
+            withTimeoutOrNull(STATES_WAIT_MS) { ui.first { it.book[name]?.reportsState == true } }
+            _ui.update { it.copy(queuedWake = null) }
+            wake(name)
+        }
+    }
+
+    fun cancelQueuedWake() {
+        queuedJob?.cancel()
+        _ui.update { it.copy(queuedWake = null) }
+    }
+
+    /** Asks the launcher for a "Wake <name>" home-screen icon. False when it can't. */
+    fun pinShortcut(name: String): Boolean = WakeShortcuts.pin(getApplication(), name, repo.shortcutToken())
+
+    // --- ad blocking ------------------------------------------------------------------
+
+    fun setBlocking(on: Boolean) {
+        val s = session ?: return
+        val topic = Topics.blockingSetTopic(_ui.value.profile.prefix)
+        _ui.update { it.copy(blocking = it.blocking.onRequested(on, System.currentTimeMillis())) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { s.publish(topic, if (on) "ON" else "OFF") }
+            } catch (t: Throwable) {
+                val reason = if (t is IllegalStateException) t.message ?: "Not connected" else "The broker didn't accept the request"
+                _ui.update { it.copy(blocking = it.blocking.onFailed(reason)) }
+            }
+        }
+    }
+
     private fun startTicker() {
         tickJob?.cancel()
         tickJob = viewModelScope.launch {
@@ -163,10 +236,11 @@ class WakeViewModel(app: Application) : AndroidViewModel(app), DefaultLifecycleO
                 _ui.update { s ->
                     val book = s.book.onTick(now)
                     timedOut = book !== s.book
-                    s.copy(book = book, now = now)
+                    s.copy(book = book, now = now, blocking = s.blocking.onTick(now, Topics.blockingSetTopic(s.profile.prefix)))
                 }
                 if (timedOut) persistLastWakes()
-                delay(if (_ui.value.book.anyBusy) 1_000 else 15_000)
+                val busy = _ui.value.book.anyBusy || _ui.value.blocking.pending
+                delay(if (busy) 1_000 else 15_000)
             }
         }
     }
@@ -200,12 +274,15 @@ class WakeViewModel(app: Application) : AndroidViewModel(app), DefaultLifecycleO
         val old = _ui.value.profile
         repo.saveProfile(n)
         val brokerChanged = old.host != n.host || old.port != n.port || old.prefix != n.prefix
+        if (brokerChanged) WakeShortcuts.clearRecent(getApplication())
         _ui.update {
             it.copy(
                 profile = n,
                 passwordLost = false,
                 book = if (brokerChanged) it.book.forgetDiscovered() else it.book,
                 board = if (brokerChanged) BoardState() else it.board,
+                blocking = if (brokerChanged) Blocking() else it.blocking,
+                stats = if (brokerChanged) null else it.stats,
                 testReport = null,
             )
         }
@@ -222,4 +299,9 @@ class WakeViewModel(app: Application) : AndroidViewModel(app), DefaultLifecycleO
     }
 
     fun clearTestReport() = _ui.update { it.copy(testReport = null) }
+
+    private companion object {
+        const val QUEUE_TIMEOUT_MS = 30_000L
+        const val STATES_WAIT_MS = 2_500L
+    }
 }

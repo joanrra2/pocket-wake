@@ -2,6 +2,9 @@ package io.github.joanrra2.pocketwake.mqtt
 
 import com.hivemq.client.mqtt.MqttGlobalPublishFilter
 import com.hivemq.client.mqtt.datatypes.MqttQos
+import com.hivemq.client.mqtt.mqtt3.exceptions.Mqtt3SubAckException
+import com.hivemq.client.mqtt.mqtt3.message.subscribe.suback.Mqtt3SubAckReturnCode
+import io.github.joanrra2.pocketwake.core.Blocking
 import io.github.joanrra2.pocketwake.core.Presence
 import io.github.joanrra2.pocketwake.core.Profile
 import io.github.joanrra2.pocketwake.core.Topics
@@ -24,7 +27,19 @@ data class TestReport(
     val board: Presence? = null,
     /** Hosts with a retained state, name -> presence. */
     val hosts: Map<String, Presence> = emptyMap(),
-)
+    /** Topic filters the broker refused for this login (SUBACK failure). */
+    val denied: List<String> = emptyList(),
+    /** Retained `<prefix>/blocking`; null = not seen. */
+    val blocking: Boolean? = null,
+) {
+    /** Refused filters the app needs for wake and PC states. */
+    fun deniedRequired(prefix: String): List<String> =
+        denied.filter { it == Topics.statusTopic(prefix) || it == Topics.stateFilter(prefix) }
+
+    /** Refused filters only the ad-blocking card uses. */
+    fun deniedOptional(prefix: String): List<String> =
+        denied.filter { it == Topics.blockingTopic(prefix) || it == Topics.statsTopic(prefix) }
+}
 
 object ConnectionTest {
     /** Connects once with [profile], listens briefly for retained board and PC states, disconnects. */
@@ -33,8 +48,13 @@ object ConnectionTest {
         val client = buildClient(p, "$clientId-test").buildAsync()
         val board = arrayOfNulls<Presence>(1)
         val hosts = ConcurrentHashMap<String, Presence>()
+        val blocking = arrayOfNulls<Boolean>(1)
         client.publishes(MqttGlobalPublishFilter.ALL) { m ->
             val payload = String(m.payloadAsBytes, Charsets.UTF_8)
+            if (m.topic.toString() == Topics.blockingTopic(p.prefix)) {
+                Blocking.parse(payload)?.let { blocking[0] = it }
+                return@publishes
+            }
             val presence = Topics.parsePresence(payload) ?: return@publishes
             val topic = m.topic.toString()
             if (topic == Topics.statusTopic(p.prefix)) board[0] = presence
@@ -46,10 +66,25 @@ object ConnectionTest {
         try {
             withTimeout(25_000) { client.connectWith(p).await() }
             val ms = (System.nanoTime() - started) / 1_000_000
-            client.subscribeWith().topicFilter(Topics.statusTopic(p.prefix)).qos(MqttQos.AT_LEAST_ONCE).send().await()
-            client.subscribeWith().topicFilter(Topics.stateFilter(p.prefix)).qos(MqttQos.AT_LEAST_ONCE).send().await()
+            // One SUBSCRIBE per filter, so a refusal (SUBACK 0x80) points at its topic. HiveMQ
+            // throws when every code in a SUBACK is a failure, which here means this filter.
+            val denied = Topics.filters(p.prefix).filter { f ->
+                try {
+                    val ack = client.subscribeWith().topicFilter(f).qos(MqttQos.AT_LEAST_ONCE).send().await()
+                    ack.returnCodes.any { it == Mqtt3SubAckReturnCode.FAILURE }
+                } catch (_: Mqtt3SubAckException) {
+                    true
+                }
+            }
             delay(listenMillis)
-            TestReport(connectMillis = ms, tls = p.tls, board = board[0]?.takeIf { it != Presence.CLEARED }, hosts = hosts.toMap())
+            TestReport(
+                connectMillis = ms,
+                tls = p.tls,
+                board = board[0]?.takeIf { it != Presence.CLEARED },
+                hosts = hosts.toMap(),
+                denied = denied,
+                blocking = blocking[0],
+            )
         } catch (t: Throwable) {
             if (t is CancellationException && t !is TimeoutCancellationException) throw t
             TestReport(error = ConnectionErrors.describe(t, p).message, tls = p.tls)

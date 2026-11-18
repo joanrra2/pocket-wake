@@ -119,6 +119,12 @@ so they may differ slightly.
    | `pocket-phone` | Publish | `sinkhole/wol/+/set` |
    | `pocket-phone` | Subscribe | `sinkhole/wol/+/state` |
    | `pocket-phone` | Subscribe | `sinkhole/status` |
+   | `pocket-phone` | Subscribe | `sinkhole/blocking` *(optional, ad-blocking card)* |
+   | `pocket-phone` | Subscribe | `sinkhole/stats` *(optional, ad-blocking card)* |
+   | `pocket-phone` | Publish | `sinkhole/blocking/set` *(optional, ad-blocking switch)* |
+
+   Leave out the three optional rules if the phone should only wake PCs: the app then
+   hides the ad-blocking card. **Test connection** lists any topic the rules refuse.
 
    Then, on the **All Users** tab, add topic `#`, action **Publish & Subscribe**,
    permission **Deny**. EMQX allows anything that no rule matches, so the rules above only
@@ -253,6 +259,9 @@ Then connect to the PC with Remote Desktop, RustDesk, AnyDesk, Parsec…
 | Can't find `<host>` | Typo in the address, or no internet on the phone. |
 | The broker's TLS certificate isn't trusted / doesn't match | Use the host name from the EMQX overview, not an IP address. |
 | No board status under `sinkhole/status` | The prefix differs between board and app, the board isn't connected (step 3.4), or the phone login can't subscribe to `sinkhole/status`. |
+| The broker won't let this login read … | A Client Authorization rule refuses that topic to the phone login (step 2.5). |
+| Ad-blocking switch not allowed (optional) | The phone login may only wake PCs. Add the three optional rules in step 2.5 to get the switch and stats. |
+| The board didn't confirm (ad blocking) | The phone login can't publish `sinkhole/blocking/set` (step 2.5), or the board went offline. |
 | Board offline | The broker holds the board's "last will": it lost Wi-Fi or power. Wake requests wait until it reconnects. |
 | No PCs reported | Add an IP to the PC on the board, or add it by name in the app. |
 
