@@ -68,7 +68,7 @@ class ScreenshotTest {
         lastMessageAt = now - 4_000,
         now = now,
         blocking = Blocking(on = true),
-        stats = BoardStats(blocked = 1834, allowed = 4127, percent = 30.7, domains = 139_651, clients = 6, at = now - 40_000),
+        stats = BoardStats(blocked = 1834, allowed = 4127, percent = 30.7, domains = 139_651, clients = 6, at = now - 40_000, uptime = 367_200, restart = "power on"),
     )
 
     private fun shot(name: String, dark: Boolean = false, content: @Composable () -> Unit) {

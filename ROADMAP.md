@@ -60,7 +60,8 @@ topics are final:
   wake (a "wake NAME" command), for people who don't want an MQTT broker.
 - **Watch-only hosts** (NAS, printer, a server): online/offline dot, no Wake button.
 - **Board health over MQTT** with a real clock: firmware version, uptime, last restart
-  and its reason, Wi-Fi signal, update available. Shown on the connection card.
+  and its reason, Wi-Fi signal, update available. ~~Uptime and last restart~~ are done in
+  0.2.1 (from `<prefix>/stats`, on the *Ad blocking* card); the rest waits for the firmware.
 
 Still open **(firmware)**:
 

@@ -37,6 +37,36 @@ class BoardTest {
         assertNull(BoardStats.parse("", 0))
     }
 
+    @Test fun `stats from firmware 0_6 carry uptime and the restart reason`() {
+        val s = BoardStats.parse("""{"blocked":1,"allowed":3,"uptime":3600,"restart":"power dip (brownout)"}""", at = 1_000)!!
+        assertEquals(3600L, s.uptime)
+        assertEquals("power dip (brownout)", s.restart)
+        assertEquals(3690L, s.uptimeAt(1_000 + 90_000))
+        assertTrue(s.unexpectedRestart)
+        assertFalse(BoardStats.parse("""{"blocked":1,"allowed":3,"restart":"firmware update"}""", 0)!!.unexpectedRestart)
+        assertEquals("say \"hi\"", BoardStats.parse("""{"blocked":1,"allowed":3,"restart":"say \"hi\""}""", 0)!!.restart)
+    }
+
+    @Test fun `older boards send neither`() {
+        val s = BoardStats.parse("""{"blocked":1,"allowed":3}""", 0)!!
+        assertNull(s.uptime)
+        assertNull(s.restart)
+        assertNull(s.uptimeAt(5_000))
+        assertFalse(s.unexpectedRestart)
+        assertNull(BoardStats.parse("""{"blocked":1,"allowed":3,"uptime":-4,"restart":"  "}""", 0)!!.uptime)
+        assertNull(BoardStats.parse("""{"blocked":1,"allowed":3,"restart":"  "}""", 0)!!.restart)
+    }
+
+    @Test fun `formats board uptime`() {
+        assertEquals("45 s", Format.uptime(45))
+        assertEquals("12 min", Format.uptime(754))
+        assertEquals("2 h", Format.uptime(7200))
+        assertEquals("3 h 12 min", Format.uptime(11_520))
+        assertEquals("1 d", Format.uptime(86_400))
+        assertEquals("4 d 6 h", Format.uptime(367_200))
+        assertEquals("Power on", Format.sentence("power on"))
+    }
+
     @Test fun `parses blocking payloads`() {
         assertEquals(true, Blocking.parse("ON"))
         assertEquals(true, Blocking.parse(" on\n"))

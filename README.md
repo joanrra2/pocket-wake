@@ -38,6 +38,8 @@ home network, checks that the PC answers, and the app shows **Online after 23 s*
 - **Last wake** per PC ("Last woken yesterday · online after 41 s"), kept on the phone.
 - **Ad blocking** card: an on/off switch for the board's blocking (turning it off asks
   first) and its stats (queries blocked, blocklist size, devices), updated every minute.
+  With board firmware 0.6 or later it also shows how long the board has been up and why
+  it last restarted (a crash, the watchdog or a power dip is marked).
   It appears only when the phone's broker login may read `<prefix>/blocking`; see
   [the optional rules](docs/SETUP.md#2-create-the-mqtt-broker).
 - **Wake shortcuts** (Android): long-press the app icon for the last woken PCs, or
@@ -90,7 +92,7 @@ In short:
 | `<prefix>/status` | board → app | `online` / `offline` (retained, last will) |
 | `<prefix>/blocking` | board → app | `ON` / `OFF` (retained), ad blocking |
 | `<prefix>/blocking/set` | app → board | `ON` / `OFF` (QoS 1, not retained) |
-| `<prefix>/stats` | board → app | JSON every 60 s: `blocked`, `allowed`, `percent`, `domains`, `clients` |
+| `<prefix>/stats` | board → app | JSON every 60 s: `blocked`, `allowed`, `percent`, `domains`, `clients`; firmware 0.6+ adds `uptime` (s) and `restart` (reason) |
 
 The last three are optional: without them the app simply hides the ad-blocking card.
 

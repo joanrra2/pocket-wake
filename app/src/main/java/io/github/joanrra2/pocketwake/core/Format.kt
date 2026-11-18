@@ -16,6 +16,20 @@ object Format {
         }
     }
 
+    /** Board uptime: 45 -> "45 s", 754 -> "12 min", 11_520 -> "3 h 12 min", 367_200 -> "4 d 6 h". */
+    fun uptime(total: Long): String {
+        val s = total.coerceAtLeast(0)
+        return when {
+            s < 60 -> "$s s"
+            s < 3600 -> "${s / 60} min"
+            s < 86_400 -> if (s / 60 % 60 == 0L) "${s / 3600} h" else "${s / 3600} h ${s / 60 % 60} min"
+            else -> if (s / 3600 % 24 == 0L) "${s / 86_400} d" else "${s / 86_400} d ${s / 3600 % 24} h"
+        }
+    }
+
+    /** "power dip (brownout)" -> "Power dip (brownout)". */
+    fun sentence(text: String): String = text.replaceFirstChar { it.uppercaseChar() }
+
     /** 139651 -> "139,651" (grouped for [locale]). */
     fun count(n: Long, locale: Locale = Locale.getDefault()): String = java.text.NumberFormat.getIntegerInstance(locale).format(n)
 
