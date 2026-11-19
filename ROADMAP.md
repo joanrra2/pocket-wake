@@ -54,6 +54,8 @@ topics are final:
 - ~~**Wake timeout per PC and Cancel**~~: done in 0.3 from `<prefix>/wol/<name>/result`.
   The app follows the board's own wait and result, and shows Cancel once the board says
   `waking` (older firmware would treat `cancel` as another wake).
+- ~~**Watch-only devices**~~: done in 0.3.1. A retained `watch only` result hides the Wake
+  button; an empty result (a MAC was added) brings it back.
 - **Push alerts without a broker account (ntfy)**: the board can post "PC online",
   "wake result", "update failed" and "restarted" to an ntfy topic it generates. The ntfy
   app (or the web app) then notifies even when Pocket Wake is closed, which Pocket Wake

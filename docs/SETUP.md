@@ -126,7 +126,8 @@ so they may differ slightly.
 
    Leave out the three ad-blocking rules if the phone should only wake PCs: the app then
    hides the ad-blocking card. Without the `result` rule the app waits the default
-   3 minutes and shows no Cancel button. **Test connection** lists any topic the rules
+   3 minutes, shows no Cancel button, and shows Wake on devices the board only watches.
+   **Test connection** lists any topic the rules
    refuse.
 
    Then, on the **All Users** tab, add topic `#`, action **Publish & Subscribe**,

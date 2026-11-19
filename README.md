@@ -20,7 +20,7 @@ Pick a PC, tap **Wake**, and watch it come up: the board sends the magic packet 
 home network, checks that the PC answers, and the app shows **Online after 23 s**.
 
 <p>
-  <img src="docs/screenshots/home.png" width="270" alt="Home screen: connection status, board online, four PCs with wake progress and results">
+  <img src="docs/screenshots/home.png" width="270" alt="Home screen: connection status, board online, PCs with wake progress and results, and a watch-only printer">
   <img src="docs/screenshots/home-dark.png" width="270" alt="Home screen in dark mode">
   <img src="docs/screenshots/settings.png" width="270" alt="Broker settings with a successful connection test">
 </p>
@@ -38,6 +38,8 @@ home network, checks that the PC answers, and the app shows **Online after 23 s*
   With board firmware 0.6 or later the board reports the result itself: the app follows
   the PC's own wait (set per PC on the board, up to 60 minutes), shows **Cancel** while
   waiting, and also shows wakes started elsewhere (Home Assistant, another phone).
+- **Watch-only devices**: a NAS, printer or camera saved on the board without a MAC
+  shows its online dot and **Watch only** instead of a Wake button (board firmware 0.6+).
 - **Last wake** per PC ("Last woken yesterday · online after 41 s"), kept on the phone.
 - **Ad blocking** card: an on/off switch for the board's blocking (turning it off asks
   first) and its stats (queries blocked, blocklist size, devices), updated every minute.
@@ -91,7 +93,7 @@ In short:
 | Topic | Direction | Payload |
 |---|---|---|
 | `<prefix>/wol/<name>/set` | app → board | `1` (any payload wakes `<name>`; QoS 1, not retained); `cancel` stops waiting (firmware 0.6+, sent only after the board said `waking`) |
-| `<prefix>/wol/<name>/result` | board → app | firmware 0.6+, retained: `waking`, `online after 41 s`, `no answer after 3 min`, `cancelled`, `already online`… |
+| `<prefix>/wol/<name>/result` | board → app | firmware 0.6+, retained: `waking`, `online after 41 s`, `no answer after 3 min`, `cancelled`, `already online`, `watch only` (saved without a MAC: no Wake button)… |
 | `<prefix>/wol/<name>/state` | board → app | `online` / `offline` (retained; only PCs with an IP) |
 | `<prefix>/status` | board → app | `online` / `offline` (retained, last will) |
 | `<prefix>/blocking` | board → app | `ON` / `OFF` (retained), ad blocking |

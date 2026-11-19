@@ -145,7 +145,11 @@ class WakeViewModel(app: Application) : AndroidViewModel(app), DefaultLifecycleO
             }
         }
         Topics.hostFromResultTopic(prefix, m.topic)?.let { name ->
-            val result = BoardResult.parse(m.payload) ?: return
+            val result = BoardResult.parse(m.payload)
+            if (result == null) {
+                _ui.update { it.copy(book = it.book.onResultCleared(name), lastMessageAt = now) }
+                return
+            }
             _ui.update { it.copy(book = it.book.onResult(name, result, now, live = !m.retained), lastMessageAt = now) }
             if (result != BoardResult.Waking) persistLastWakes()
             return
@@ -172,8 +176,10 @@ class WakeViewModel(app: Application) : AndroidViewModel(app), DefaultLifecycleO
     fun wake(name: String) {
         val s = session ?: return
         val prefix = _ui.value.profile.prefix
-        WakeShortcuts.onWoken(getApplication(), name, repo.shortcutToken())
         _ui.update { it.copy(book = it.book.onWakeRequested(name, System.currentTimeMillis())) }
+        // The board only watches this PC: publishing would do nothing.
+        if (_ui.value.book[name]?.wake is WakeStatus.WatchOnly) return
+        WakeShortcuts.onWoken(getApplication(), name, repo.shortcutToken())
         viewModelScope.launch {
             try {
                 withContext(Dispatchers.IO) { s.publish(Topics.setTopic(prefix, name), "1") }

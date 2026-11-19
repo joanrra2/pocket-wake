@@ -125,4 +125,36 @@ class WakeResultTest {
         assertSame(idle, idle.onResult(pc, BoardResult.Other("magic packet sent"), t0))
         assertSame(idle, idle.onResult("NOPE", BoardResult.Cancelled, t0))
     }
+
+    @Test fun `watch-only PCs get no wake, and any wait ends at once`() {
+        assertEquals(BoardResult.WatchOnly, BoardResult.parse("watch only"))
+        val idle = HostBook().onState(pc, Presence.ONLINE, t0, live = false)
+        // Retained on connect: marks the PC, shows nothing.
+        val watched = idle.onResult(pc, BoardResult.WatchOnly, t0 + 100, live = false)
+        assertTrue(watched[pc]!!.watchOnly)
+        assertEquals(WakeStatus.Idle, watched[pc]!!.wake)
+        // Wake (a shortcut, or a tap before the result arrived) publishes nothing.
+        assertEquals(WakeStatus.WatchOnly(t0 + 200), watched.onWakeRequested(pc, t0 + 200)[pc]!!.wake)
+        // A wait already running ends when the board answers "watch only".
+        val ended = waiting().onResult(pc, BoardResult.WatchOnly, t0 + 900)[pc]!!
+        assertEquals(WakeStatus.WatchOnly(t0 + 900), ended.wake)
+        assertTrue(ended.watchOnly)
+    }
+
+    @Test fun `watch-only arrives before the state, and clears when the board gets a MAC`() {
+        var b = HostBook().onResult(pc, BoardResult.WatchOnly, t0, live = false)
+        b = b.onState(pc, Presence.OFFLINE, t0, live = false)
+        assertTrue(b[pc]!!.watchOnly)
+        assertTrue(b[pc]!!.reportsState)
+        // Empty retained result: the MAC was added.
+        assertFalse(b.onResultCleared(pc)[pc]!!.watchOnly)
+        val plain = HostBook().onState(pc, Presence.OFFLINE, t0, live = false)
+        assertSame(plain, plain.onResultCleared(pc))
+        assertSame(plain, plain.onResultCleared("NOPE"))
+        // Any other result also means it can be woken again.
+        val woken = b.onResult(pc, BoardResult.Waking, t0 + 1_000)[pc]!!
+        assertFalse(woken.watchOnly)
+        assertTrue(woken.wake is WakeStatus.Waiting)
+        assertFalse(b.addManual(pc).forgetDiscovered()[pc]!!.watchOnly)
+    }
 }

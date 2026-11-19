@@ -342,3 +342,35 @@ test('a live wake from elsewhere shows as waiting', () => {
   assert.equal(b[PC].wake.board, true);
   assert.equal(b[PC].wake.startedAt, t0 + 1000);
 });
+
+test('watch-only PCs: no wake, and any wait ends at once', () => {
+  assert.deepEqual(C.parseResult('watch only'), { kind: 'watchOnly' });
+  const idle = C.onState({}, PC, 'online', t0, false);
+  // Retained on connect: marks the PC, shows nothing.
+  const watched = C.onResult(idle, PC, { kind: 'watchOnly' }, t0 + 100, false);
+  assert.equal(watched[PC].watchOnly, true);
+  assert.equal(watched[PC].wake.kind, 'idle');
+  // Wake (a shortcut, or a tap before the result arrived) publishes nothing.
+  assert.deepEqual(C.onWakeRequested(watched, PC, t0 + 200)[PC].wake, { kind: 'watchOnly', at: t0 + 200 });
+  // A wait already running ends when the board answers "watch only".
+  const ended = C.onResult(waitingBook(), PC, { kind: 'watchOnly' }, t0 + 900)[PC];
+  assert.deepEqual(ended.wake, { kind: 'watchOnly', at: t0 + 900 });
+  assert.equal(ended.watchOnly, true);
+});
+
+test('watch-only arrives before the state, and clears when the board gets a MAC', () => {
+  let b = C.onResult({}, PC, { kind: 'watchOnly' }, t0, false);
+  b = C.onState(b, PC, 'offline', t0, false);
+  assert.equal(b[PC].watchOnly, true);
+  assert.equal(b[PC].reportsState, true);
+  // Empty retained result: the MAC was added.
+  assert.equal(C.onResultCleared(b, PC)[PC].watchOnly, false);
+  const plain = C.onState({}, PC, 'offline', t0, false);
+  assert.equal(C.onResultCleared(plain, PC), plain);
+  assert.equal(C.onResultCleared(plain, 'NOPE'), plain);
+  // Any other result also means it can be woken again.
+  const woken = C.onResult(b, PC, { kind: 'waking' }, t0 + 1000);
+  assert.equal(woken[PC].watchOnly, false);
+  assert.equal(woken[PC].wake.kind, 'waiting');
+  assert.equal(C.forgetDiscovered(C.addManual(b, PC))[PC].watchOnly, false);
+});
