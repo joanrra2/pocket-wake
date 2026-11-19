@@ -122,9 +122,12 @@ so they may differ slightly.
    | `pocket-phone` | Subscribe | `sinkhole/blocking` *(optional, ad-blocking card)* |
    | `pocket-phone` | Subscribe | `sinkhole/stats` *(optional, ad-blocking card)* |
    | `pocket-phone` | Publish | `sinkhole/blocking/set` *(optional, ad-blocking switch)* |
+   | `pocket-phone` | Subscribe | `sinkhole/wol/+/result` *(optional, wake results and Cancel; board firmware 0.6+)* |
 
-   Leave out the three optional rules if the phone should only wake PCs: the app then
-   hides the ad-blocking card. **Test connection** lists any topic the rules refuse.
+   Leave out the three ad-blocking rules if the phone should only wake PCs: the app then
+   hides the ad-blocking card. Without the `result` rule the app waits the default
+   3 minutes and shows no Cancel button. **Test connection** lists any topic the rules
+   refuse.
 
    Then, on the **All Users** tab, add topic `#`, action **Publish & Subscribe**,
    permission **Deny**. EMQX allows anything that no rule matches, so the rules above only
@@ -261,6 +264,7 @@ Then connect to the PC with Remote Desktop, RustDesk, AnyDesk, Parsec…
 | No board status under `sinkhole/status` | The prefix differs between board and app, the board isn't connected (step 3.4), or the phone login can't subscribe to `sinkhole/status`. |
 | The broker won't let this login read … | A Client Authorization rule refuses that topic to the phone login (step 2.5). |
 | Ad-blocking switch not allowed (optional) | The phone login may only wake PCs. Add the three optional rules in step 2.5 to get the switch and stats. |
+| Wake results not allowed (optional) | Add the `sinkhole/wol/+/result` rule in step 2.5 to get the board's own results and Cancel (board firmware 0.6+). |
 | The board didn't confirm (ad blocking) | The phone login can't publish `sinkhole/blocking/set` (step 2.5), or the board went offline. |
 | Board offline | The broker holds the board's "last will": it lost Wi-Fi or power. Wake requests wait until it reconnects. |
 | No PCs reported | Add an IP to the PC on the board, or add it by name in the app. |
@@ -284,7 +288,8 @@ the topics it needs; that's expected.)
 
 | Topic | Direction | Payload |
 |---|---|---|
-| `<prefix>/wol/<name>/set` | app → board | `1`, QoS 1, not retained (any payload wakes) |
+| `<prefix>/wol/<name>/set` | app → board | `1`, QoS 1, not retained (any payload wakes); `cancel` stops waiting (firmware 0.6+) |
+| `<prefix>/wol/<name>/result` | board → app | last wake result, retained (firmware 0.6+) |
 | `<prefix>/wol/<name>/state` | board → app | `online` / `offline`, retained, only for PCs with an IP |
 | `<prefix>/status` | board → app | `online` / `offline`, retained; `offline` is the board's last will |
 

@@ -4,6 +4,11 @@
 export const DEFAULT_PREFIX = 'sinkhole';
 export const MAX_NAME_LENGTH = 64;
 export const WAKE_TIMEOUT_MS = 3 * 60 * 1000;
+// While the board reports the wake itself (firmware 0.6+): its own wait is per PC, up to
+// 60 minutes, and it publishes the result when it ends.
+export const BOARD_WAKE_LIMIT_MS = 61 * 60 * 1000;
+// How long Cancel waits for the board's "cancelled" before stopping the wait here anyway.
+export const CANCEL_CONFIRM_MS = 10_000;
 /** How long the blocking switch waits for the board to confirm a change. */
 export const BLOCKING_CONFIRM_MS = 10_000;
 
@@ -33,22 +38,22 @@ export const Topics = {
   stateFilter: (p) => `${p}/wol/+/state`,
   state: (p, name) => `${p}/wol/${name}/state`,
   set: (p, name) => `${p}/wol/${name}/set`,
+  resultFilter: (p) => `${p}/wol/+/result`,
   blocking: (p) => `${p}/blocking`,
   blockingSet: (p) => `${p}/blocking/set`,
   stats: (p) => `${p}/stats`,
 
   /** Everything the app reads. Wake and blocking topics are only written. */
-  filters: (p) => [`${p}/status`, `${p}/wol/+/state`, `${p}/blocking`, `${p}/stats`],
+  filters: (p) => [`${p}/status`, `${p}/wol/+/state`, `${p}/blocking`, `${p}/stats`, `${p}/wol/+/result`],
+
+  /** Filters the app works without (older boards, or a login not allowed to read them). */
+  optionalFilters: (p) => [`${p}/blocking`, `${p}/stats`, `${p}/wol/+/result`],
 
   /** Host name from `<prefix>/wol/<name>/state`, or null. */
-  hostFromState(prefix, topic) {
-    const head = `${prefix}/wol/`;
-    const tail = '/state';
-    if (!topic.startsWith(head) || !topic.endsWith(tail)) return null;
-    if (topic.length <= head.length + tail.length) return null;
-    const name = topic.slice(head.length, topic.length - tail.length);
-    return name && !name.includes('/') ? name : null;
-  },
+  hostFromState: (prefix, topic) => hostFrom(prefix, topic, '/state'),
+
+  /** Host name from `<prefix>/wol/<name>/result` (firmware 0.6+), or null. */
+  hostFromResult: (prefix, topic) => hostFrom(prefix, topic, '/result'),
 
   /** 'online' | 'offline' | 'cleared' (empty retained payload) | null (unknown, ignore). */
   parsePresence(payload) {
@@ -59,6 +64,32 @@ export const Topics = {
     return null;
   },
 };
+
+function hostFrom(prefix, topic, tail) {
+  const head = `${prefix}/wol/`;
+  if (!topic.startsWith(head) || !topic.endsWith(tail)) return null;
+  if (topic.length <= head.length + tail.length) return null;
+  const name = topic.slice(head.length, topic.length - tail.length);
+  return name && !name.includes('/') ? name : null;
+}
+
+/**
+ * `<prefix>/wol/<name>/result` (firmware 0.6+, retained) -> { kind: 'waking' | 'online'
+ * (seconds) | 'noAnswer' (text) | 'cancelled' | 'alreadyOnline' | 'other' (text) }, or null
+ * for an empty (cleared) payload.
+ */
+export function parseResult(payload) {
+  const text = String(payload ?? '').trim().slice(0, 64);
+  const l = text.toLowerCase();
+  if (!text) return null;
+  if (l === 'waking') return { kind: 'waking' };
+  if (l === 'cancelled' || l === 'canceled') return { kind: 'cancelled' };
+  if (l === 'already online') return { kind: 'alreadyOnline' };
+  if (l.startsWith('no answer')) return { kind: 'noAnswer', text };
+  const m = /^online after (\d+) s$/.exec(l);
+  if (m) return { kind: 'online', seconds: Number(m[1]) };
+  return { kind: 'other', text };
+}
 
 // --- ad blocking and stats (<prefix>/blocking, <prefix>/stats) -------------------------
 
@@ -217,7 +248,11 @@ export function applySetupLink(profile, link) {
 //
 // host = { name, presence: 'online'|'offline'|'unknown', presenceSince, reportsState, manual,
 //          wake: { kind, startedAt?, onlineAt?, at?, reason? }, lastWake: { at, s } | null }
-// wake.kind: idle | sending | waiting | succeeded | sentUnverified | alreadyOnline | timedOut | failed
+// wake.kind: idle | sending | waiting | succeeded | sentUnverified | alreadyOnline | timedOut |
+//            cancelled | failed
+// A waiting wake has board: true once the board said "waking" (firmware 0.6+: it publishes
+// the result, keeps its own per-PC wait and understands "cancel"), and cancelAt (ms, 0 = no).
+// timedOut may carry text: the board's own result ("no answer after 10 min").
 // A book is a plain object { [name]: host }. Every function returns a new book.
 
 const IDLE = Object.freeze({ kind: 'idle' });
@@ -338,7 +373,7 @@ export function onWakePublished(book, name, now) {
     const started = h.wake.startedAt;
     if (h.presence === 'online') return { ...h, wake: { kind: 'alreadyOnline', at: now }, lastWake: { at: started, s: null } };
     if (!h.reportsState) return { ...h, wake: { kind: 'sentUnverified', at: started }, lastWake: { at: started, s: null } };
-    return { ...h, wake: { kind: 'waiting', startedAt: started } };
+    return { ...h, wake: { kind: 'waiting', startedAt: started, board: false, cancelAt: 0 } };
   });
 }
 
@@ -346,13 +381,76 @@ export function onWakeFailed(book, name, reason, now) {
   return edit(book, name, (h) => ({ ...h, wake: { kind: 'failed', at: now, reason } }));
 }
 
-/** Times out waits older than WAKE_TIMEOUT_MS. Returns the same object when nothing changed. */
+/** Only boards that said "waking" understand "cancel"; older ones would wake the PC again. */
+export const canCancel = (w) => w.kind === 'waiting' && !!w.board && !w.cancelAt;
+
+/**
+ * Applies `<prefix>/wol/<name>/result`. A live "waking" turns a wait into one the board
+ * tracks, or shows a wake started elsewhere. A retained "waking" only confirms a wait already
+ * running here (a board that restarted mid-wake leaves "waking" behind for good). Final
+ * results end a wait; a retained one only ends a wait the board already confirmed, since an
+ * older retained result may be left over from a previous wake.
+ */
+export function onResult(book, name, result, now, live = true) {
+  const h = book[name];
+  const w = h?.wake;
+  const busy = w && isBusy(w);
+  if (result.kind === 'waking') {
+    if (w?.kind === 'waiting') return put(book, { ...h, wake: { ...w, board: true } });
+    // A "waking" that beats the publish acknowledgement; onWakePublished only acts on sending.
+    if (w?.kind === 'sending') return put(book, { ...h, wake: { kind: 'waiting', startedAt: w.startedAt, board: true, cancelAt: 0 } });
+    if (!live) return book;
+    return put(book, { ...(h ?? newHost(name)), wake: { kind: 'waiting', startedAt: now, board: true, cancelAt: 0 } });
+  }
+  if (!busy || !(live || w.board)) return book;
+  const started = w.startedAt;
+  switch (result.kind) {
+    case 'online':
+      return put(book, { ...h, wake: { kind: 'succeeded', startedAt: started, onlineAt: started + result.seconds * 1000 }, lastWake: { at: started, s: result.seconds } });
+    case 'noAnswer':
+      return put(book, { ...h, wake: { kind: 'timedOut', startedAt: started, text: result.text }, lastWake: { at: started, s: null } });
+    case 'cancelled':
+      return put(book, { ...h, wake: { kind: 'cancelled', at: now } });
+    case 'alreadyOnline':
+      // The board marks the PC online without publishing its state topic, so do it here.
+      return put(book, {
+        ...h,
+        presence: 'online',
+        presenceSince: h.presence === 'online' ? h.presenceSince : now,
+        wake: { kind: 'alreadyOnline', at: now, sent: false },
+        lastWake: { at: started, s: null },
+      });
+    default:
+      return book;
+  }
+}
+
+/** Cancel was sent; the board answers with "cancelled". */
+export function onCancelRequested(book, name, now) {
+  return edit(book, name, (h) => (h.wake.kind === 'waiting' ? { ...h, wake: { ...h.wake, cancelAt: now } } : h));
+}
+
+/** The cancel didn't reach the broker; the wait goes on. */
+export function onCancelFailed(book, name) {
+  return edit(book, name, (h) => (h.wake.kind === 'waiting' ? { ...h, wake: { ...h.wake, cancelAt: 0 } } : h));
+}
+
+/**
+ * Times out waits older than WAKE_TIMEOUT_MS, or BOARD_WAKE_LIMIT_MS when the board reports
+ * the result itself, and ends a Cancel the board didn't confirm within CANCEL_CONFIRM_MS.
+ * Returns the same object when nothing changed.
+ */
 export function onTick(book, now) {
   let out = book;
   for (const h of Object.values(book)) {
-    if (h.wake.kind === 'waiting' && now - h.wake.startedAt >= WAKE_TIMEOUT_MS) {
-      const started = h.wake.startedAt;
-      out = put(out, { ...h, wake: { kind: 'timedOut', startedAt: started }, lastWake: { at: started, s: null } });
+    const w = h.wake;
+    if (w.kind !== 'waiting') continue;
+    if (w.cancelAt && now - w.cancelAt >= CANCEL_CONFIRM_MS) {
+      out = put(out, { ...h, wake: { kind: 'cancelled', at: now } });
+    } else if (now - w.startedAt >= (w.board ? BOARD_WAKE_LIMIT_MS : WAKE_TIMEOUT_MS)) {
+      const wake = { kind: 'timedOut', startedAt: w.startedAt };
+      if (w.board) wake.text = 'No result from the board';
+      out = put(out, { ...h, wake, lastWake: { at: w.startedAt, s: null } });
     }
   }
   return out;

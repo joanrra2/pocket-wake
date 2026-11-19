@@ -124,6 +124,7 @@ private fun PocketWakeApp(
                 ui = ui,
                 onWake = vm::wake,
                 onDismissWake = vm::dismissWake,
+                onCancelWake = vm::cancelWake,
                 onAddHost = vm::addHost,
                 onRemoveHost = vm::removeHost,
                 onRetry = vm::retry,

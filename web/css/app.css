@@ -201,6 +201,9 @@ svg.i.sm { width: 18px; height: 18px; }
 
 .progress { height: 4px; border-radius: 4px; background: color-mix(in srgb, var(--primary) 22%, transparent); overflow: hidden; margin: 8px 0 6px; }
 .progress > i { display: block; height: 100%; background: var(--primary); border-radius: 4px; transition: width .9s linear; }
+.progress.indeterminate > i { width: 35%; animation: indeterminate 1.4s ease-in-out infinite; }
+@keyframes indeterminate { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
+.row.end { justify-content: flex-end; }
 
 .spinner {
   width: 16px; height: 16px; flex: none;
@@ -331,6 +334,7 @@ dialog h2 { margin: 0 0 16px; font-size: 22px; font-weight: 500; }
 @media (prefers-reduced-motion: reduce) {
   .dot.pulse, .spinner { animation: none; }
   .progress > i, .avatar { transition: none; }
+  .progress.indeterminate > i { animation: none; width: 100%; opacity: .5; }
 }
 
 /* --- utilities (no inline styles: the CSP forbids them) ------------------------------- */

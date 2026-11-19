@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onRoot
 import com.github.takahirom.roborazzi.captureRoboImage
 import io.github.joanrra2.pocketwake.core.Blocking
 import io.github.joanrra2.pocketwake.core.BoardStats
+import io.github.joanrra2.pocketwake.core.BoardResult
 import io.github.joanrra2.pocketwake.core.HostBook
 import io.github.joanrra2.pocketwake.core.LastWake
 import io.github.joanrra2.pocketwake.core.Presence
@@ -56,6 +57,7 @@ class ScreenshotTest {
         .withLastWakes(mapOf("NAS" to LastWake(now - 26 * 60 * min, 41)))
         // DESKTOP: woken 12 s ago, waiting for "online".
         .onWakeRequested("DESKTOP", now - 12_000).onWakePublished("DESKTOP", now - 11_800)
+        .onResult("DESKTOP", BoardResult.Waking, now - 11_000)
         // GAMING-PC: woken and came up after 23 s.
         .onWakeRequested("GAMING-PC", now - 2 * min).onWakePublished("GAMING-PC", now - 2 * min + 200)
         .onState("GAMING-PC", Presence.ONLINE, now - 2 * min + 23_000)
@@ -81,9 +83,9 @@ class ScreenshotTest {
     @Composable
     private fun Home(ui: UiState) = HomeScreen(ui, noop, noop, noop, noop, {}, {})
 
-    @Test @Config(qualifiers = "w400dp-h1260dp-xxhdpi") fun home() = shot("home") { Home(connected()) }
+    @Test @Config(qualifiers = "w400dp-h1320dp-xxhdpi") fun home() = shot("home") { Home(connected()) }
 
-    @Test @Config(qualifiers = "w400dp-h1260dp-night-xxhdpi") fun homeDark() = shot("home-dark", dark = true) { Home(connected()) }
+    @Test @Config(qualifiers = "w400dp-h1320dp-night-xxhdpi") fun homeDark() = shot("home-dark", dark = true) { Home(connected()) }
 
     @Test fun setup() = shot("setup") { Home(UiState(now = now)) }
 

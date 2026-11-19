@@ -4,7 +4,7 @@ import * as C from './core.js';
 import * as Store from './store.js';
 import { openSession, testConnection } from './broker.js';
 
-const VERSION = '0.2.1-beta';
+const VERSION = '0.3.0-beta';
 const { Topics, Format } = C;
 
 const state = {
@@ -97,6 +97,17 @@ function onMessage(prefix, m) {
     render();
     return;
   }
+  const resultFor = Topics.hostFromResult(prefix, m.topic);
+  if (resultFor) {
+    const result = C.parseResult(m.payload);
+    if (!result) return;
+    setBook(C.onResult(state.book, resultFor, result, now, !m.retained));
+    if (result.kind !== 'waking') persistLastWakes();
+    state.lastMessageAt = now;
+    scheduleTick();
+    render();
+    return;
+  }
   const presence = Topics.parsePresence(m.payload);
   if (!presence) return;
   if (m.topic === Topics.status(prefix)) {
@@ -158,6 +169,21 @@ async function wake(name) {
     setBook(C.onWakeFailed(state.book, name, e.message || 'Not connected', Date.now()));
   }
   persistLastWakes();
+  render();
+}
+
+// Stops the board waiting for a PC. Only offered once the board said "waking": older firmware
+// treats any payload on the set topic, "cancel" included, as another wake.
+async function cancelWake(name) {
+  const w = state.book[name]?.wake;
+  if (!session || !w || !C.canCancel(w)) return;
+  setBook(C.onCancelRequested(state.book, name, Date.now()));
+  render();
+  try {
+    await session.publish(Topics.set(state.profile.prefix, name), 'cancel');
+  } catch {
+    setBook(C.onCancelFailed(state.book, name));
+  }
   render();
 }
 
@@ -439,16 +465,23 @@ function wakeSection(h) {
     case 'waiting': {
       const elapsed = Math.max(0, Math.floor((now - w.startedAt) / 1000));
       const pct = Math.min(100, (elapsed * 1000 * 100) / C.WAKE_TIMEOUT_MS);
+      // Once the board says "waking" it keeps the PC's own wait (up to 60 min): no fixed maximum.
+      const board = w.kind === 'waiting' && w.board;
+      const cancel = board
+        ? `<div class="row end"><button class="btn text" data-action="cancel-wake" data-name="${esc(h.name)}" ${C.canCancel(w) ? '' : 'disabled'}>${w.cancelAt ? 'Cancelling…' : 'Cancel'}</button></div>`
+        : '';
       return `<div class="host-body">
-        <div class="row"><span class="spinner"></span><span class="grow">${w.kind === 'sending' ? 'Sending wake request…' : `Waking… ${Format.seconds(elapsed)}`}</span><span class="muted small">max 3 min</span></div>
-        <div class="progress"><i data-pct="${pct.toFixed(1)}"></i></div>
+        <div class="row"><span class="spinner"></span><span class="grow">${w.kind === 'sending' ? 'Sending wake request…' : `Waking… ${Format.seconds(elapsed)}`}</span>${board ? '' : '<span class="muted small">max 3 min</span>'}</div>
+        ${board ? '<div class="progress indeterminate"><i></i></div>' : `<div class="progress"><i data-pct="${pct.toFixed(1)}"></i></div>`}
         ${w.kind === 'waiting' ? '<div class="muted small">The board sent the magic packet and is waiting for the PC to answer.</div>' : ''}
+        ${cancel}
       </div>`;
     }
     case 'succeeded': return banner('ok', 'check', `Online after ${Format.seconds(C.wakeSeconds(w))}`, `Woken at ${Format.clock(now, w.startedAt)}`, h.name);
-    case 'alreadyOnline': return banner('note', 'info', 'Already online', 'The wake request was sent anyway.', h.name);
+    case 'alreadyOnline': return banner('note', 'info', 'Already online', w.sent === false ? 'The board checked it and sent nothing.' : 'The wake request was sent anyway.', h.name);
     case 'sentUnverified': return banner('note', 'info', 'Magic packet sent', "This PC has no IP on the board, so it can't confirm when it's up.", h.name);
-    case 'timedOut': return banner('warn', 'warn', 'No answer after 3 min', "Check that Wake-on-LAN is enabled in the PC's BIOS and network adapter, and that it's on wired power.", h.name);
+    case 'cancelled': return banner('note', 'info', 'Cancelled', 'The board stopped waiting. If the PC still starts, its dot turns green.', h.name);
+    case 'timedOut': return banner('warn', 'warn', w.text ? w.text.charAt(0).toUpperCase() + w.text.slice(1) : 'No answer after 3 min', "Check that Wake-on-LAN is enabled in the PC's BIOS and network adapter, and that it's on wired power.", h.name);
     case 'failed': return banner('err', 'warn', "Couldn't send", w.reason, h.name);
     default: return '';
   }
@@ -573,7 +606,8 @@ function renderSettingsDynamic() {
   const prefix = Topics.normalizePrefix(f.elements.prefix.value) || '<prefix>';
   document.getElementById('topics').innerHTML =
     `<div>wake    ${esc(prefix)}/wol/&lt;PC&gt;/set</div><div>state   ${esc(prefix)}/wol/+/state</div><div>board   ${esc(prefix)}/status</div>` +
-    `<div class="muted">optional, for the ad-blocking card:</div><div>read    ${esc(prefix)}/blocking, ${esc(prefix)}/stats</div><div>switch  ${esc(prefix)}/blocking/set</div>`;
+    `<div class="muted">optional, for the ad-blocking card:</div><div>read    ${esc(prefix)}/blocking, ${esc(prefix)}/stats</div><div>switch  ${esc(prefix)}/blocking/set</div>` +
+    `<div class="muted">optional, board firmware 0.6+ (wake results, Cancel):</div><div>result  ${esc(prefix)}/wol/+/result</div>`;
   const btn = document.getElementById('test-btn');
   btn.disabled = state.testing;
   btn.innerHTML = state.testing ? '<span class="spinner"></span>Testing…' : 'Test connection';
@@ -600,6 +634,7 @@ function reportCard(r) {
   if (required.length) parts.push(line('warn', 'err-c', `The broker won't let this login read ${required.join(' and ')}`, 'Add a Client Authorization rule for this login that allows Subscribe on it.'));
   if (r.blocking === true || r.blocking === false) parts.push(line('check', 'ok-c', `Ad blocking ${r.blocking ? 'on' : 'off'}`, "The home screen shows a switch and the board's stats."));
   else if (optional.length) parts.push(line('info', 'pri-c', 'Ad-blocking switch not allowed (optional)', `To see and switch ad blocking here, allow this login Subscribe on ${r.prefix}/blocking and ${r.prefix}/stats, and Publish on ${r.prefix}/blocking/set.`));
+  if (denied.includes(Topics.resultFilter(r.prefix))) parts.push(line('info', 'pri-c', 'Wake results not allowed (optional)', `With board firmware 0.6 or later, allow this login Subscribe on ${Topics.resultFilter(r.prefix)} to get the board's own wake results and a Cancel button.`));
   return `<section class="card high report mt16">${parts.join('')}</section>`;
 }
 
@@ -619,6 +654,7 @@ app.addEventListener('click', async (e) => {
     case 'wake': wake(name); break;
     case 'blocking': setBlocking(el.dataset.on === 'on'); break;
     case 'dismiss': setBook(C.dismissWake(state.book, name)); render(); break;
+    case 'cancel-wake': cancelWake(name); break;
     case 'menu': state.menuFor = state.menuFor === name ? null : name; render(); break;
     case 'copy': {
       state.menuFor = null;

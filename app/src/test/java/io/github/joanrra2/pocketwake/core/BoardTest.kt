@@ -120,7 +120,7 @@ class BoardTest {
         assertEquals("sinkhole/blocking/set", Topics.blockingSetTopic("sinkhole"))
         assertEquals("home/sinkhole/stats", Topics.statsTopic("home/sinkhole"))
         assertEquals(
-            listOf("sinkhole/status", "sinkhole/wol/+/state", "sinkhole/blocking", "sinkhole/stats"),
+            listOf("sinkhole/status", "sinkhole/wol/+/state", "sinkhole/blocking", "sinkhole/stats", "sinkhole/wol/+/result"),
             Topics.filters("sinkhole"),
         )
     }
