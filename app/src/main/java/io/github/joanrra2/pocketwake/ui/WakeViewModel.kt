@@ -8,10 +8,12 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.viewModelScope
 import io.github.joanrra2.pocketwake.core.BoardStats
 import io.github.joanrra2.pocketwake.core.Blocking
+import io.github.joanrra2.pocketwake.core.BoardResult
 import io.github.joanrra2.pocketwake.core.HostBook
 import io.github.joanrra2.pocketwake.core.Presence
 import io.github.joanrra2.pocketwake.core.Profile
 import io.github.joanrra2.pocketwake.core.Topics
+import io.github.joanrra2.pocketwake.core.WakeStatus
 import io.github.joanrra2.pocketwake.data.SettingsRepository
 import io.github.joanrra2.pocketwake.mqtt.BrokerSession
 import io.github.joanrra2.pocketwake.mqtt.Connection
@@ -142,6 +144,12 @@ class WakeViewModel(app: Application) : AndroidViewModel(app), DefaultLifecycleO
                 return
             }
         }
+        Topics.hostFromResultTopic(prefix, m.topic)?.let { name ->
+            val result = BoardResult.parse(m.payload) ?: return
+            _ui.update { it.copy(book = it.book.onResult(name, result, now, live = !m.retained), lastMessageAt = now) }
+            if (result != BoardResult.Waking) persistLastWakes()
+            return
+        }
         val presence = Topics.parsePresence(m.payload) ?: return
         if (m.topic == Topics.statusTopic(prefix)) {
             _ui.update { s ->
@@ -179,6 +187,25 @@ class WakeViewModel(app: Application) : AndroidViewModel(app), DefaultLifecycleO
     }
 
     fun dismissWake(name: String) = _ui.update { it.copy(book = it.book.dismissWake(name)) }
+
+    /**
+     * Stops the board waiting for [name]. Only offered once the board said "waking": older
+     * firmware treats any payload on the set topic, "cancel" included, as another wake.
+     */
+    fun cancelWake(name: String) {
+        val s = session ?: return
+        val w = _ui.value.book[name]?.wake as? WakeStatus.Waiting ?: return
+        if (!w.canCancel) return
+        val prefix = _ui.value.profile.prefix
+        _ui.update { it.copy(book = it.book.onCancelRequested(name, System.currentTimeMillis())) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { s.publish(Topics.setTopic(prefix, name), "cancel") }
+            } catch (_: Throwable) {
+                _ui.update { it.copy(book = it.book.onCancelFailed(name)) }
+            }
+        }
+    }
 
     /**
      * Wakes [name] once connected (the app was just opened from a shortcut). Waits briefly

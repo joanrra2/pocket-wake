@@ -5,7 +5,10 @@ package io.github.joanrra2.pocketwake.core
  *
  *   <prefix>/status              online / offline (retained, last will)
  *   <prefix>/wol/<name>/state    online / offline (retained, only hosts with an IP)
- *   <prefix>/wol/<name>/set      any payload wakes <name> (check, wake, verify)
+ *   <prefix>/wol/<name>/set      any payload wakes <name> (check, wake, verify);
+ *                                "cancel" stops waiting (firmware 0.6+; older boards wake!)
+ *   <prefix>/wol/<name>/result   last wake result (retained, firmware 0.6+): waking,
+ *                                online after 41 s, no answer after 3 min, cancelled...
  *   <prefix>/blocking            ON / OFF (retained), ad blocking
  *   <prefix>/blocking/set        ON / OFF turns ad blocking on or off
  *   <prefix>/stats               JSON every 60 s: blocked, allowed, percent, domains, clients (+ uptime, restart)
@@ -41,17 +44,26 @@ object Topics {
     fun stateFilter(prefix: String) = "$prefix/wol/+/state"
     fun stateTopic(prefix: String, name: String) = "$prefix/wol/$name/state"
     fun setTopic(prefix: String, name: String) = "$prefix/wol/$name/set"
+    fun resultFilter(prefix: String) = "$prefix/wol/+/result"
     fun blockingTopic(prefix: String) = "$prefix/blocking"
     fun blockingSetTopic(prefix: String) = "$prefix/blocking/set"
     fun statsTopic(prefix: String) = "$prefix/stats"
 
     /** Everything the app reads. Wake and blocking topics are only written. */
-    fun filters(prefix: String) = listOf(statusTopic(prefix), stateFilter(prefix), blockingTopic(prefix), statsTopic(prefix))
+    fun filters(prefix: String) =
+        listOf(statusTopic(prefix), stateFilter(prefix), blockingTopic(prefix), statsTopic(prefix), resultFilter(prefix))
+
+    /** Filters the app works without (older boards, or a login not allowed to read them). */
+    fun optionalFilters(prefix: String) = listOf(blockingTopic(prefix), statsTopic(prefix), resultFilter(prefix))
 
     /** Host name from `<prefix>/wol/<name>/state`, or null when [topic] is something else. */
-    fun hostFromStateTopic(prefix: String, topic: String): String? {
+    fun hostFromStateTopic(prefix: String, topic: String): String? = hostFrom(prefix, topic, "/state")
+
+    /** Host name from `<prefix>/wol/<name>/result`, or null when [topic] is something else. */
+    fun hostFromResultTopic(prefix: String, topic: String): String? = hostFrom(prefix, topic, "/result")
+
+    private fun hostFrom(prefix: String, topic: String, tail: String): String? {
         val head = "$prefix/wol/"
-        val tail = "/state"
         if (!topic.startsWith(head) || !topic.endsWith(tail)) return null
         if (topic.length <= head.length + tail.length) return null
         val name = topic.substring(head.length, topic.length - tail.length)

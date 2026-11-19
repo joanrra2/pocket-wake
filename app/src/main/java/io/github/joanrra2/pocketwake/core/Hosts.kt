@@ -1,7 +1,52 @@
 package io.github.joanrra2.pocketwake.core
 
-/** How long to wait for `online` after a wake before giving up. */
+/** How long to wait for `online` after a wake before giving up (the board's default). */
 const val WAKE_TIMEOUT_MS = 3 * 60 * 1000L
+
+/**
+ * Safety limit while the board reports the wake itself (firmware 0.6+): the board's own
+ * wait is per PC, up to 60 minutes, and it publishes the result when it ends.
+ */
+const val BOARD_WAKE_LIMIT_MS = 61 * 60 * 1000L
+
+/**
+ * How long Cancel waits for the board's "cancelled" before stopping the wait here anyway
+ * (the board publishes nothing when it had already stopped waiting).
+ */
+const val CANCEL_CONFIRM_MS = 10_000L
+
+/**
+ * `<prefix>/wol/<name>/result` (firmware 0.6+, retained): what the board says about the
+ * last wake of a PC.
+ */
+sealed interface BoardResult {
+    data object Waking : BoardResult
+    data class Online(val seconds: Long) : BoardResult
+    /** "no answer after 3 min", "no answer after 10 min"... (the PC's own wait). */
+    data class NoAnswer(val text: String) : BoardResult
+    data object Cancelled : BoardResult
+    data object AlreadyOnline : BoardResult
+    /** "magic packet sent" (PC without an IP on the board) or anything newer. */
+    data class Other(val text: String) : BoardResult
+
+    companion object {
+        private val ONLINE = Regex("""online after (\d+) s""")
+
+        /** Null for an empty (cleared) payload. */
+        fun parse(payload: String): BoardResult? {
+            val t = payload.trim().take(64)
+            val l = t.lowercase()
+            return when {
+                t.isEmpty() -> null
+                l == "waking" -> Waking
+                l == "cancelled" || l == "canceled" -> Cancelled
+                l == "already online" -> AlreadyOnline
+                l.startsWith("no answer") -> NoAnswer(t)
+                else -> ONLINE.matchEntire(l)?.let { Online(it.groupValues[1].toLong()) } ?: Other(t)
+            }
+        }
+    }
+}
 
 sealed interface WakeStatus {
     data object Idle : WakeStatus
@@ -9,8 +54,22 @@ sealed interface WakeStatus {
     /** Publishing the wake request to the broker. */
     data class Sending(val startedAt: Long) : WakeStatus
 
-    /** The broker has the request; waiting for the state topic to turn `online`. */
-    data class Waiting(val startedAt: Long) : WakeStatus
+    /**
+     * The broker has the request; waiting for the state topic to turn `online`.
+     * [board]: the board said it's waking this PC (firmware 0.6+), so it publishes the
+     * result, keeps its own per-PC wait and understands "cancel".
+     * [cancelAt]: when Cancel was sent, 0 = not cancelling.
+     */
+    data class Waiting(
+        val startedAt: Long,
+        val board: Boolean = false,
+        val cancelAt: Long = 0,
+    ) : WakeStatus {
+        val cancelling: Boolean get() = cancelAt > 0
+
+        /** Only boards that said "waking" understand "cancel"; older ones would wake again. */
+        val canCancel: Boolean get() = board && !cancelling
+    }
 
     data class Succeeded(val startedAt: Long, val onlineAt: Long) : WakeStatus {
         val seconds: Long get() = ((onlineAt - startedAt) / 1000).coerceAtLeast(0)
@@ -22,7 +81,11 @@ sealed interface WakeStatus {
     /** The PC was already reported online when the request went out. */
     data class AlreadyOnline(val at: Long) : WakeStatus
 
-    data class TimedOut(val startedAt: Long) : WakeStatus
+    /** [text]: the board's own result ("no answer after 10 min"), when it sent one. */
+    data class TimedOut(val startedAt: Long, val text: String? = null) : WakeStatus
+
+    /** Stopped with Cancel (here or anywhere else). */
+    data class Cancelled(val at: Long) : WakeStatus
 
     data class Failed(val at: Long, val reason: String) : WakeStatus
 
@@ -164,17 +227,86 @@ data class HostBook(
     fun onWakeFailed(name: String, reason: String, now: Long): HostBook =
         edit(name) { it.copy(wake = WakeStatus.Failed(now, reason)) }
 
-    /** Times out waits older than [WAKE_TIMEOUT_MS]. Returns this same instance when nothing changed. */
+    /**
+     * Applies `<prefix>/wol/<name>/result` (firmware 0.6+).
+     *
+     * A live "waking" turns a wait into one the board tracks, or shows a wake started
+     * elsewhere (Home Assistant, another phone). A retained "waking" only confirms a wait
+     * already running here: a board that restarted mid-wake leaves "waking" behind for good.
+     * Final results end a wait; a retained one only ends a wait the board already confirmed,
+     * since an older retained result may be left over from a previous wake.
+     */
+    fun onResult(name: String, result: BoardResult, now: Long, live: Boolean = true): HostBook {
+        val h = hosts[name]
+        val w = h?.wake
+        val waiting = w as? WakeStatus.Waiting
+        val started = when (w) {
+            is WakeStatus.Sending -> w.startedAt
+            is WakeStatus.Waiting -> w.startedAt
+            else -> null
+        }
+        if (result == BoardResult.Waking) {
+            val wake = when {
+                waiting != null -> waiting.copy(board = true)
+                // A "waking" that beats the publish acknowledgement; onWakePublished only
+                // acts on Sending, so this stays.
+                w is WakeStatus.Sending -> WakeStatus.Waiting(w.startedAt, board = true)
+                live -> WakeStatus.Waiting(now, board = true)
+                else -> return this
+            }
+            return put((h ?: Host(name = name)).copy(wake = wake))
+        }
+        if (h == null || started == null || !(live || waiting?.board == true)) return this
+        return when (result) {
+            is BoardResult.Online -> put(
+                h.copy(
+                    wake = WakeStatus.Succeeded(started, started + result.seconds * 1000),
+                    lastWake = LastWake(started, result.seconds),
+                )
+            )
+            is BoardResult.NoAnswer ->
+                put(h.copy(wake = WakeStatus.TimedOut(started, result.text), lastWake = LastWake(started, null)))
+            BoardResult.Cancelled -> put(h.copy(wake = WakeStatus.Cancelled(now)))
+            BoardResult.AlreadyOnline -> put(h.copy(wake = WakeStatus.AlreadyOnline(now), lastWake = LastWake(started, null)))
+            else -> this
+        }
+    }
+
+    /** Cancel was sent; the board answers with "cancelled". */
+    fun onCancelRequested(name: String, now: Long): HostBook = edit(name) { h ->
+        val w = h.wake as? WakeStatus.Waiting ?: return@edit h
+        h.copy(wake = w.copy(cancelAt = now))
+    }
+
+    /** The cancel didn't reach the broker; the wait goes on. */
+    fun onCancelFailed(name: String): HostBook = edit(name) { h ->
+        val w = h.wake as? WakeStatus.Waiting ?: return@edit h
+        h.copy(wake = w.copy(cancelAt = 0))
+    }
+
+    /**
+     * Times out waits older than [WAKE_TIMEOUT_MS], or [BOARD_WAKE_LIMIT_MS] when the board
+     * reports the result itself, and ends a Cancel the board didn't confirm within
+     * [CANCEL_CONFIRM_MS]. Returns this same instance when nothing changed.
+     */
     fun onTick(now: Long): HostBook {
-        val expired = hosts.values.filter { h ->
-            val w = h.wake
-            w is WakeStatus.Waiting && now - w.startedAt >= WAKE_TIMEOUT_MS
+        var book = this
+        for (h in hosts.values) {
+            val w = h.wake as? WakeStatus.Waiting ?: continue
+            val limit = if (w.board) BOARD_WAKE_LIMIT_MS else WAKE_TIMEOUT_MS
+            book = when {
+                w.cancelling && now - w.cancelAt >= CANCEL_CONFIRM_MS -> book.put(h.copy(wake = WakeStatus.Cancelled(now)))
+                now - w.startedAt >= limit ->
+                    book.put(
+                        h.copy(
+                            wake = WakeStatus.TimedOut(w.startedAt, if (w.board) "No result from the board" else null),
+                            lastWake = LastWake(w.startedAt, null),
+                        )
+                    )
+                else -> book
+            }
         }
-        if (expired.isEmpty()) return this
-        return expired.fold(this) { book, h ->
-            val started = (h.wake as WakeStatus.Waiting).startedAt
-            book.put(h.copy(wake = WakeStatus.TimedOut(started), lastWake = LastWake(started, null)))
-        }
+        return book
     }
 
     fun dismissWake(name: String): HostBook = edit(name) { it.copy(wake = WakeStatus.Idle) }

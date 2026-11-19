@@ -39,6 +39,9 @@ data class TestReport(
     /** Refused filters only the ad-blocking card uses. */
     fun deniedOptional(prefix: String): List<String> =
         denied.filter { it == Topics.blockingTopic(prefix) || it == Topics.statsTopic(prefix) }
+
+    /** True when the login may not read the board's wake results (firmware 0.6+). */
+    fun deniedResults(prefix: String): Boolean = Topics.resultFilter(prefix) in denied
 }
 
 object ConnectionTest {

@@ -266,6 +266,7 @@ fun SettingsScreen(
                     Mono("wake    $shownPrefix/wol/<PC>/set")
                     Mono("state   $shownPrefix/wol/+/state")
                     Mono("board   $shownPrefix/status")
+                    Mono("result  $shownPrefix/wol/+/result  (optional)")
                 }
             }
 
@@ -384,6 +385,14 @@ private fun TestReportCard(r: TestReport, prefix: String) {
                     MaterialTheme.colorScheme.primary,
                     "Ad-blocking switch not allowed (optional)",
                     "To see and switch ad blocking here, allow this login Subscribe on $prefix/blocking and $prefix/stats, and Publish on $prefix/blocking/set.",
+                )
+            }
+            if (r.deniedResults(prefix)) {
+                ReportLine(
+                    Icons.Filled.Info,
+                    MaterialTheme.colorScheme.primary,
+                    "Wake results not allowed (optional)",
+                    "With board firmware 0.6 or later, allow this login Subscribe on ${Topics.resultFilter(prefix)} to get the board's own wake results and a Cancel button.",
                 )
             }
         }

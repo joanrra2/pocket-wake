@@ -70,7 +70,7 @@ test('wake then online reports seconds to online', () => {
   b = C.onWakeRequested(b, 'PC', t0 + 1000);
   assert.equal(b.PC.wake.kind, 'sending');
   b = C.onWakePublished(b, 'PC', t0 + 1200);
-  assert.deepEqual(b.PC.wake, { kind: 'waiting', startedAt: t0 + 1000 });
+  assert.deepEqual(b.PC.wake, { kind: 'waiting', startedAt: t0 + 1000, board: false, cancelAt: 0 });
   assert.ok(C.anyBusy(b));
   b = C.onState(b, 'PC', 'online', t0 + 24500);
   assert.equal(b.PC.wake.kind, 'succeeded');
@@ -192,7 +192,7 @@ test('blocking and stats topics', () => {
   assert.equal(Topics.blocking('sinkhole'), 'sinkhole/blocking');
   assert.equal(Topics.blockingSet('sinkhole'), 'sinkhole/blocking/set');
   assert.equal(Topics.stats('home/sinkhole'), 'home/sinkhole/stats');
-  assert.deepEqual(Topics.filters('sinkhole'), ['sinkhole/status', 'sinkhole/wol/+/state', 'sinkhole/blocking', 'sinkhole/stats']);
+  assert.deepEqual(Topics.filters('sinkhole'), ['sinkhole/status', 'sinkhole/wol/+/state', 'sinkhole/blocking', 'sinkhole/stats', 'sinkhole/wol/+/result']);
 });
 
 test('parses blocking payloads', () => {
@@ -263,4 +263,79 @@ test('formats board uptime', () => {
   assert.equal(Format.uptime(11_520), '3 h 12 min');
   assert.equal(Format.uptime(86_400), '1 d');
   assert.equal(Format.uptime(367_200), '4 d 6 h');
+});
+
+// --- wake results and Cancel (board firmware 0.6+) ------------------------------------------
+
+const PC = 'OFFICE-PC';
+const waitingBook = () => C.onWakePublished(C.onWakeRequested(C.onState({}, PC, 'offline', t0, false), PC, t0), PC, t0 + 200);
+const boardWaiting = () => C.onResult(waitingBook(), PC, { kind: 'waking' }, t0 + 1000);
+
+test("parses the board's wake results", () => {
+  assert.deepEqual(C.parseResult('waking'), { kind: 'waking' });
+  assert.deepEqual(C.parseResult('online after 41 s'), { kind: 'online', seconds: 41 });
+  assert.deepEqual(C.parseResult('no answer after 10 min'), { kind: 'noAnswer', text: 'no answer after 10 min' });
+  assert.deepEqual(C.parseResult('cancelled'), { kind: 'cancelled' });
+  assert.deepEqual(C.parseResult('Already online\n'), { kind: 'alreadyOnline' });
+  assert.deepEqual(C.parseResult('magic packet sent'), { kind: 'other', text: 'magic packet sent' });
+  assert.equal(C.parseResult(''), null);
+  assert.equal(Topics.hostFromResult('sinkhole', `sinkhole/wol/${PC}/result`), PC);
+  assert.equal(Topics.hostFromResult('sinkhole', `sinkhole/wol/${PC}/state`), null);
+  assert.equal(Topics.hostFromState('sinkhole', `sinkhole/wol/${PC}/result`), null);
+  assert.ok(Topics.optionalFilters('sinkhole').includes('sinkhole/wol/+/result'));
+});
+
+test('waking lets the board track the wait and allows cancel', () => {
+  assert.equal(C.canCancel(waitingBook()[PC].wake), false);
+  const w = boardWaiting()[PC].wake;
+  assert.equal(w.board, true);
+  assert.equal(C.canCancel(w), true);
+  assert.equal(w.startedAt, t0);
+  // A "waking" that beats the publish ack is kept.
+  let b = C.onWakeRequested(C.onState({}, PC, 'offline', t0, false), PC, t0);
+  b = C.onWakePublished(C.onResult(b, PC, { kind: 'waking' }, t0 + 100), PC, t0 + 300);
+  assert.equal(b[PC].wake.board, true);
+});
+
+test('board-tracked waits outlast the 3-minute default', () => {
+  const b = boardWaiting();
+  assert.equal(C.onTick(b, t0 + C.WAKE_TIMEOUT_MS + 1), b);
+  assert.equal(C.onTick(b, t0 + C.BOARD_WAKE_LIMIT_MS)[PC].wake.text, 'No result from the board');
+  assert.equal(C.onTick(waitingBook(), t0 + C.WAKE_TIMEOUT_MS)[PC].wake.kind, 'timedOut');
+});
+
+test('board results end the wait', () => {
+  const ok = C.onResult(boardWaiting(), PC, { kind: 'online', seconds: 41 }, t0 + 42000)[PC];
+  assert.equal(C.wakeSeconds(ok.wake), 41);
+  assert.deepEqual(ok.lastWake, { at: t0, s: 41 });
+  const none = C.onResult(boardWaiting(), PC, { kind: 'noAnswer', text: 'no answer after 10 min' }, t0 + 600000)[PC];
+  assert.deepEqual(none.wake, { kind: 'timedOut', startedAt: t0, text: 'no answer after 10 min' });
+  assert.equal(C.onResult(boardWaiting(), PC, { kind: 'alreadyOnline' }, t0 + 1500)[PC].wake.kind, 'alreadyOnline');
+});
+
+test('cancel waits for the board, or gives up after a while', () => {
+  let b = C.onCancelRequested(boardWaiting(), PC, t0 + 5000);
+  assert.equal(C.canCancel(b[PC].wake), false);
+  assert.equal(C.onResult(b, PC, { kind: 'cancelled' }, t0 + 6000)[PC].wake.kind, 'cancelled');
+  assert.equal(C.onTick(b, t0 + 5000 + C.CANCEL_CONFIRM_MS - 1), b);
+  assert.equal(C.onTick(b, t0 + 5000 + C.CANCEL_CONFIRM_MS)[PC].wake.kind, 'cancelled');
+  b = C.onCancelFailed(b, PC);
+  assert.equal(C.canCancel(b[PC].wake), true);
+});
+
+test("stale retained results don't touch a wait or start one", () => {
+  const b = waitingBook();
+  assert.equal(C.onResult(b, PC, { kind: 'online', seconds: 41 }, t0 + 500, false), b);
+  assert.equal(C.onResult(b, PC, { kind: 'cancelled' }, t0 + 500, false), b);
+  assert.equal(C.onResult(boardWaiting(), PC, { kind: 'online', seconds: 30 }, t0 + 60000, false)[PC].wake.kind, 'succeeded');
+  const idle = C.onState({}, PC, 'offline', t0, false);
+  assert.equal(C.onResult(idle, PC, { kind: 'waking' }, t0, false), idle);
+  assert.equal(C.onResult(idle, PC, { kind: 'online', seconds: 12 }, t0), idle);
+  assert.equal(C.onResult(idle, 'NOPE', { kind: 'cancelled' }, t0), idle);
+});
+
+test('a live wake from elsewhere shows as waiting', () => {
+  const b = C.onResult(C.onState({}, PC, 'offline', t0, false), PC, { kind: 'waking' }, t0 + 1000);
+  assert.equal(b[PC].wake.board, true);
+  assert.equal(b[PC].wake.startedAt, t0 + 1000);
 });

@@ -104,6 +104,7 @@ fun HomeScreen(
     onSetBlocking: (Boolean) -> Unit = {},
     onCancelQueuedWake: () -> Unit = {},
     onPin: (String) -> Boolean = { false },
+    onCancelWake: (String) -> Unit = {},
 ) {
     val scroll = TopAppBarDefaults.enterAlwaysScrollBehavior()
     val snackbar = remember { SnackbarHostState() }
@@ -202,6 +203,7 @@ fun HomeScreen(
                     connected = ui.connection is Connection.Connected,
                     onWake = { onWake(host.name) },
                     onDismiss = { onDismissWake(host.name) },
+                    onCancel = { onCancelWake(host.name) },
                     onRemove = { onRemoveHost(host.name) },
                     onPin = { onPin(host.name) },
                     snackbar = snackbar,
@@ -420,6 +422,7 @@ private fun HostCard(
     connected: Boolean,
     onWake: () -> Unit,
     onDismiss: () -> Unit,
+    onCancel: () -> Unit,
     onRemove: () -> Unit,
     onPin: () -> Boolean,
     snackbar: SnackbarHostState,
@@ -527,7 +530,7 @@ private fun HostCard(
                     }
                 }
             }
-            WakeSection(host, now, onDismiss)
+            WakeSection(host, now, onDismiss, onCancel)
             host.lastWake?.takeIf { !busy && host.wake == WakeStatus.Idle }?.let { lw ->
                 Spacer(Modifier.height(10.dp))
                 Text(
@@ -552,7 +555,7 @@ private fun presenceLine(host: Host, now: Long, connected: Boolean): String = wh
 }
 
 @Composable
-private fun WakeSection(host: Host, now: Long, onDismiss: () -> Unit) {
+private fun WakeSection(host: Host, now: Long, onDismiss: () -> Unit, onCancel: () -> Unit) {
     val status = LocalStatusColors.current
     AnimatedContent(
         targetState = host.wake,
@@ -565,6 +568,9 @@ private fun WakeSection(host: Host, now: Long, onDismiss: () -> Unit) {
             is WakeStatus.Sending, is WakeStatus.Waiting -> {
                 val started = if (w is WakeStatus.Sending) w.startedAt else (w as WakeStatus.Waiting).startedAt
                 val elapsed = ((now - started) / 1000).coerceAtLeast(0)
+                // Once the board says "waking" it keeps the PC's own wait (up to 60 min), so
+                // there's no fixed maximum to show.
+                val board = (w as? WakeStatus.Waiting)?.board == true
                 Column(Modifier.padding(start = 62.dp, end = 8.dp, top = 12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
@@ -574,13 +580,19 @@ private fun WakeSection(host: Host, now: Long, onDismiss: () -> Unit) {
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.weight(1f),
                         )
-                        Text("max 3 min", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (!board) {
+                            Text("max 3 min", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                     Spacer(Modifier.height(8.dp))
-                    LinearProgressIndicator(
-                        progress = { (elapsed * 1000f / WAKE_TIMEOUT_MS).coerceIn(0f, 1f) },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                    if (board) {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    } else {
+                        LinearProgressIndicator(
+                            progress = { (elapsed * 1000f / WAKE_TIMEOUT_MS).coerceIn(0f, 1f) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                     if (w is WakeStatus.Waiting) {
                         Spacer(Modifier.height(6.dp))
                         Text(
@@ -588,6 +600,13 @@ private fun WakeSection(host: Host, now: Long, onDismiss: () -> Unit) {
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        if (w.board) {
+                            TextButton(
+                                onClick = onCancel,
+                                enabled = w.canCancel,
+                                modifier = Modifier.align(Alignment.End),
+                            ) { Text(if (w.cancelling) "Cancelling…" else "Cancel") }
+                        }
                     }
                 }
             }
@@ -619,8 +638,16 @@ private fun WakeSection(host: Host, now: Long, onDismiss: () -> Unit) {
                 icon = { Icon(Icons.Filled.Warning, null, tint = status.warning) },
                 container = status.warningContainer,
                 content = status.onWarningContainer,
-                title = "No answer after 3 min",
+                title = w.text?.let(Format::sentence) ?: "No answer after 3 min",
                 body = "Check that Wake-on-LAN is enabled in the PC's BIOS and network adapter, and that it's on wired power.",
+                onDismiss = onDismiss,
+            )
+            is WakeStatus.Cancelled -> ResultBanner(
+                icon = { Icon(Icons.Filled.Info, null, tint = MaterialTheme.colorScheme.primary) },
+                container = MaterialTheme.colorScheme.secondaryContainer,
+                content = MaterialTheme.colorScheme.onSecondaryContainer,
+                title = "Cancelled",
+                body = "The board stopped waiting. If the PC still starts, its dot turns green.",
                 onDismiss = onDismiss,
             )
             is WakeStatus.Failed -> ResultBanner(

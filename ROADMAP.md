@@ -51,8 +51,9 @@ without firmware changes:
 Coming with Pocket AdBlock firmware 0.6.0 **(firmware)**; the app adds each one once its
 topics are final:
 
-- **Wake timeout per PC and Cancel**: the board's own timeout replaces the app's fixed
-  3 minutes, and a Cancel button on "Waking…" stops the board's checks.
+- ~~**Wake timeout per PC and Cancel**~~: done in 0.3 from `<prefix>/wol/<name>/result`.
+  The app follows the board's own wait and result, and shows Cancel once the board says
+  `waking` (older firmware would treat `cancel` as another wake).
 - **Push alerts without a broker account (ntfy)**: the board can post "PC online",
   "wake result", "update failed" and "restarted" to an ntfy topic it generates. The ntfy
   app (or the web app) then notifies even when Pocket Wake is closed, which Pocket Wake
