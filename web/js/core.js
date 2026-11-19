@@ -75,7 +75,7 @@ function hostFrom(prefix, topic, tail) {
 
 /**
  * `<prefix>/wol/<name>/result` (firmware 0.6+, retained) -> { kind: 'waking' | 'online'
- * (seconds) | 'noAnswer' (text) | 'cancelled' | 'alreadyOnline' | 'other' (text) }, or null
+ * (seconds) | 'noAnswer' (text) | 'cancelled' | 'alreadyOnline' | 'watchOnly' | 'other' (text) }, or null
  * for an empty (cleared) payload.
  */
 export function parseResult(payload) {
@@ -85,6 +85,7 @@ export function parseResult(payload) {
   if (l === 'waking') return { kind: 'waking' };
   if (l === 'cancelled' || l === 'canceled') return { kind: 'cancelled' };
   if (l === 'already online') return { kind: 'alreadyOnline' };
+  if (l === 'watch only') return { kind: 'watchOnly' };
   if (l.startsWith('no answer')) return { kind: 'noAnswer', text };
   const m = /^online after (\d+) s$/.exec(l);
   if (m) return { kind: 'online', seconds: Number(m[1]) };
@@ -249,7 +250,8 @@ export function applySetupLink(profile, link) {
 // host = { name, presence: 'online'|'offline'|'unknown', presenceSince, reportsState, manual,
 //          wake: { kind, startedAt?, onlineAt?, at?, reason? }, lastWake: { at, s } | null }
 // wake.kind: idle | sending | waiting | succeeded | sentUnverified | alreadyOnline | timedOut |
-//            cancelled | failed
+//            cancelled | failed | watchOnly
+// watchOnly: true on a host the board only watches (no MAC saved, firmware 0.6+): no Wake button.
 // A waiting wake has board: true once the board said "waking" (firmware 0.6+: it publishes
 // the result, keeps its own per-PC wait and understands "cancel"), and cancelAt (ms, 0 = no).
 // timedOut may carry text: the board's own result ("no answer after 10 min").
@@ -327,7 +329,7 @@ export function manualNames(book) {
 export function forgetDiscovered(book) {
   const b = {};
   for (const h of Object.values(book)) {
-    if (h.manual) b[h.name] = { ...h, presence: 'unknown', presenceSince: null, reportsState: false, wake: IDLE };
+    if (h.manual) b[h.name] = { ...h, presence: 'unknown', presenceSince: null, reportsState: false, wake: IDLE, watchOnly: false };
   }
   return b;
 }
@@ -361,9 +363,10 @@ export function onState(book, name, presence, now, live = true) {
   return put(book, { ...base, presence, presenceSince: since, reportsState: true, wake, lastWake });
 }
 
+/** A watch-only PC gets wake.kind 'watchOnly' instead, and nothing should be published. */
 export function onWakeRequested(book, name, now) {
   const h = book[name] ?? newHost(name, { manual: true });
-  return put(book, { ...h, wake: { kind: 'sending', startedAt: now } });
+  return put(book, { ...h, wake: h.watchOnly ? { kind: 'watchOnly', at: now } : { kind: 'sending', startedAt: now } });
 }
 
 /** The broker accepted the wake request. */
@@ -390,9 +393,17 @@ export const canCancel = (w) => w.kind === 'waiting' && !!w.board && !w.cancelAt
  * running here (a board that restarted mid-wake leaves "waking" behind for good). Final
  * results end a wait; a retained one only ends a wait the board already confirmed, since an
  * older retained result may be left over from a previous wake.
+ *
+ * "watch only" (retained or live) marks the PC as one the board can't wake and ends any wait
+ * for it. Any other result means the board has a MAC for it again.
  */
 export function onResult(book, name, result, now, live = true) {
   const h = book[name];
+  if (result.kind === 'watchOnly') {
+    const base = h ?? newHost(name);
+    return put(book, { ...base, watchOnly: true, wake: isBusy(base.wake) ? { kind: 'watchOnly', at: now } : base.wake });
+  }
+  if (h?.watchOnly) return onResult(put(book, { ...h, watchOnly: false }), name, result, now, live);
   const w = h?.wake;
   const busy = w && isBusy(w);
   if (result.kind === 'waking') {
@@ -423,6 +434,14 @@ export function onResult(book, name, result, now, live = true) {
     default:
       return book;
   }
+}
+
+/**
+ * The retained result was deleted (an empty payload): the board got a MAC for a PC it only
+ * watched. Nothing else changes: an empty result means "no result yet".
+ */
+export function onResultCleared(book, name) {
+  return book[name]?.watchOnly ? put(book, { ...book[name], watchOnly: false }) : book;
 }
 
 /** Cancel was sent; the board answers with "cancelled". */

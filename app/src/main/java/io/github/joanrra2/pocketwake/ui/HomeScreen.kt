@@ -474,7 +474,14 @@ private fun HostCard(
                         color = if (online) status.online else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                if (!busy) {
+                if (host.watchOnly && !busy) {
+                    Text(
+                        "Watch only",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                    )
+                } else if (!busy) {
                     val label = when (host.wake) {
                         is WakeStatus.TimedOut, is WakeStatus.Failed -> "Retry"
                         else -> "Wake"
@@ -488,7 +495,7 @@ private fun HostCard(
                 Column {
                     IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "More for ${host.name}") }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                        DropdownMenuItem(
+                        if (!host.watchOnly) DropdownMenuItem(
                             text = { Text("Copy wake topic") },
                             onClick = {
                                 menu = false
@@ -498,7 +505,7 @@ private fun HostCard(
                                 }
                             },
                         )
-                        if (canPin) {
+                        if (canPin && !host.watchOnly) {
                             DropdownMenuItem(
                                 text = { Text("Add to home screen") },
                                 onClick = {
@@ -517,6 +524,7 @@ private fun HostCard(
                             text = {
                                 Text(
                                     when {
+                                        host.watchOnly -> "Watched by the board · no MAC to wake it"
                                         host.reportsState && host.manual -> "Reported by the board · added by you"
                                         host.reportsState -> "Reported by the board"
                                         else -> "Added by you · no IP on the board"
@@ -656,6 +664,14 @@ private fun WakeSection(host: Host, now: Long, onDismiss: () -> Unit, onCancel: 
                 content = MaterialTheme.colorScheme.onErrorContainer,
                 title = "Couldn't send",
                 body = w.reason,
+                onDismiss = onDismiss,
+            )
+            is WakeStatus.WatchOnly -> ResultBanner(
+                icon = { Icon(Icons.Filled.Info, null, tint = MaterialTheme.colorScheme.primary) },
+                container = MaterialTheme.colorScheme.secondaryContainer,
+                content = MaterialTheme.colorScheme.onSecondaryContainer,
+                title = "Only watched",
+                body = "The board has no MAC for this PC, so it can't wake it. Add the MAC on the board to wake it from here.",
                 onDismiss = onDismiss,
             )
         }

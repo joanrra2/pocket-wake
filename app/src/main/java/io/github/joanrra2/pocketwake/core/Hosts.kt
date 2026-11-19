@@ -26,6 +26,8 @@ sealed interface BoardResult {
     data class NoAnswer(val text: String) : BoardResult
     data object Cancelled : BoardResult
     data object AlreadyOnline : BoardResult
+    /** The board has no MAC for this PC and only watches it (firmware 0.6+). */
+    data object WatchOnly : BoardResult
     /** "magic packet sent" (PC without an IP on the board) or anything newer. */
     data class Other(val text: String) : BoardResult
 
@@ -41,6 +43,7 @@ sealed interface BoardResult {
                 l == "waking" -> Waking
                 l == "cancelled" || l == "canceled" -> Cancelled
                 l == "already online" -> AlreadyOnline
+                l == "watch only" -> WatchOnly
                 l.startsWith("no answer") -> NoAnswer(t)
                 else -> ONLINE.matchEntire(l)?.let { Online(it.groupValues[1].toLong()) } ?: Other(t)
             }
@@ -90,6 +93,9 @@ sealed interface WakeStatus {
 
     data class Failed(val at: Long, val reason: String) : WakeStatus
 
+    /** The board only watches this PC (no MAC saved), so nothing was or can be woken. */
+    data class WatchOnly(val at: Long) : WakeStatus
+
     val isBusy: Boolean get() = this is Sending || this is Waiting
 }
 
@@ -111,6 +117,8 @@ data class Host(
     val manual: Boolean = false,
     val wake: WakeStatus = WakeStatus.Idle,
     val lastWake: LastWake? = null,
+    /** The board said "watch only": it has no MAC for this PC, so there's no Wake button. */
+    val watchOnly: Boolean = false,
 )
 
 /**
@@ -164,7 +172,7 @@ data class HostBook(
     /** Drops everything learned from the broker (after switching broker or prefix). */
     fun forgetDiscovered(): HostBook = copy(
         hosts = hosts.filterValues { it.manual }.mapValues { (_, h) ->
-            h.copy(presence = Presence.UNKNOWN, presenceSince = null, reportsState = false, wake = WakeStatus.Idle)
+            h.copy(presence = Presence.UNKNOWN, presenceSince = null, reportsState = false, wake = WakeStatus.Idle, watchOnly = false)
         }
     )
 
@@ -209,8 +217,11 @@ data class HostBook(
         return put(base.copy(presence = presence, presenceSince = since, reportsState = true, wake = wake, lastWake = last))
     }
 
-    fun onWakeRequested(name: String, now: Long): HostBook =
-        put((hosts[name] ?: Host(name = name, manual = true)).copy(wake = WakeStatus.Sending(now)))
+    /** A watch-only PC gets [WakeStatus.WatchOnly] instead, and nothing should be published. */
+    fun onWakeRequested(name: String, now: Long): HostBook {
+        val h = hosts[name] ?: Host(name = name, manual = true)
+        return put(h.copy(wake = if (h.watchOnly) WakeStatus.WatchOnly(now) else WakeStatus.Sending(now)))
+    }
 
     /** The broker accepted the wake request. */
     fun onWakePublished(name: String, now: Long): HostBook = edit(name) { h ->
@@ -236,9 +247,18 @@ data class HostBook(
      * already running here: a board that restarted mid-wake leaves "waking" behind for good.
      * Final results end a wait; a retained one only ends a wait the board already confirmed,
      * since an older retained result may be left over from a previous wake.
+     *
+     * "watch only" (retained or live) marks the PC as one the board can't wake and ends
+     * any wait for it. Any other result means the board has a MAC for it again.
      */
     fun onResult(name: String, result: BoardResult, now: Long, live: Boolean = true): HostBook {
         val h = hosts[name]
+        if (result == BoardResult.WatchOnly) {
+            val base = h ?: Host(name = name)
+            val wake = if (base.wake.isBusy) WakeStatus.WatchOnly(now) else base.wake
+            return put(base.copy(watchOnly = true, wake = wake))
+        }
+        if (h?.watchOnly == true) return put(h.copy(watchOnly = false)).onResult(name, result, now, live)
         val w = h?.wake
         val waiting = w as? WakeStatus.Waiting
         val started = when (w) {
@@ -280,6 +300,13 @@ data class HostBook(
             else -> this
         }
     }
+
+    /**
+     * The retained result was deleted (an empty payload): the board got a MAC for a PC it
+     * only watched. Nothing else changes: an empty result means "no result yet".
+     */
+    fun onResultCleared(name: String): HostBook =
+        hosts[name]?.takeIf { it.watchOnly }?.let { put(it.copy(watchOnly = false)) } ?: this
 
     /** Cancel was sent; the board answers with "cancelled". */
     fun onCancelRequested(name: String, now: Long): HostBook = edit(name) { h ->

@@ -54,6 +54,9 @@ class ScreenshotTest {
         .onState("NAS", Presence.ONLINE, now - 300 * min, live = false)
         .onState("NAS", Presence.ONLINE, now - 300 * min)
         .addManual("OLD-LAPTOP")
+        // PRINTER: saved on the board without a MAC, so it's only watched.
+        .onState("PRINTER", Presence.ONLINE, now - 600 * min, live = false)
+        .onResult("PRINTER", BoardResult.WatchOnly, now, live = false)
         .withLastWakes(mapOf("NAS" to LastWake(now - 26 * 60 * min, 41)))
         // DESKTOP: woken 12 s ago, waiting for "online".
         .onWakeRequested("DESKTOP", now - 12_000).onWakePublished("DESKTOP", now - 11_800)
@@ -83,9 +86,9 @@ class ScreenshotTest {
     @Composable
     private fun Home(ui: UiState) = HomeScreen(ui, noop, noop, noop, noop, {}, {})
 
-    @Test @Config(qualifiers = "w400dp-h1320dp-xxhdpi") fun home() = shot("home") { Home(connected()) }
+    @Test @Config(qualifiers = "w400dp-h1420dp-xxhdpi") fun home() = shot("home") { Home(connected()) }
 
-    @Test @Config(qualifiers = "w400dp-h1320dp-night-xxhdpi") fun homeDark() = shot("home-dark", dark = true) { Home(connected()) }
+    @Test @Config(qualifiers = "w400dp-h1420dp-night-xxhdpi") fun homeDark() = shot("home-dark", dark = true) { Home(connected()) }
 
     @Test fun setup() = shot("setup") { Home(UiState(now = now)) }
 

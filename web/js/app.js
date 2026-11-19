@@ -4,7 +4,7 @@ import * as C from './core.js';
 import * as Store from './store.js';
 import { openSession, testConnection } from './broker.js';
 
-const VERSION = '0.3.0-beta';
+const VERSION = '0.3.1-beta';
 const { Topics, Format } = C;
 
 const state = {
@@ -100,9 +100,8 @@ function onMessage(prefix, m) {
   const resultFor = Topics.hostFromResult(prefix, m.topic);
   if (resultFor) {
     const result = C.parseResult(m.payload);
-    if (!result) return;
-    setBook(C.onResult(state.book, resultFor, result, now, !m.retained));
-    if (result.kind !== 'waking') persistLastWakes();
+    setBook(result ? C.onResult(state.book, resultFor, result, now, !m.retained) : C.onResultCleared(state.book, resultFor));
+    if (result && result.kind !== 'waking') persistLastWakes();
     state.lastMessageAt = now;
     scheduleTick();
     render();
@@ -161,6 +160,8 @@ async function wake(name) {
   const prefix = state.profile.prefix;
   setBook(C.onWakeRequested(state.book, name, Date.now()));
   render();
+  // The board only watches this PC: publishing would do nothing.
+  if (state.book[name]?.wake.kind === 'watchOnly') return;
   scheduleTick();
   try {
     await session.publish(Topics.set(prefix, name), '1');
@@ -427,7 +428,12 @@ function hostCard(h) {
   const label = h.wake.kind === 'timedOut' || h.wake.kind === 'failed' ? 'Retry' : 'Wake';
   const disabled = connected() ? '' : 'disabled';
   const menuOpen = state.menuFor === h.name;
-  const origin = h.reportsState && h.manual ? 'Reported by the board · added by you' : h.reportsState ? 'Reported by the board' : 'Added by you · no IP on the board';
+  let origin = 'Added by you · no IP on the board';
+  if (h.watchOnly) origin = 'Watched by the board · no MAC to wake it';
+  else if (h.reportsState) origin = h.manual ? 'Reported by the board · added by you' : 'Reported by the board';
+  let action = '';
+  if (h.watchOnly && !busy) action = '<span class="watch-only">Watch only</span>';
+  else if (!busy) action = `<button class="btn ${online ? 'tonal' : ''}" data-action="wake" data-name="${n}" ${disabled}>${label}</button>`;
 
   return `
   <article class="card host">
@@ -437,11 +443,11 @@ function hostCard(h) {
         <div class="host-name">${n}</div>
         <div class="host-line ${online && connected() ? 'online' : ''}">${esc(presenceLine(h))}</div>
       </div>
-      ${busy ? '' : `<button class="btn ${online ? 'tonal' : ''}" data-action="wake" data-name="${n}" ${disabled}>${label}</button>`}
+      ${action}
       <div class="menu">
         <button class="icon-btn" data-action="menu" data-name="${n}" aria-label="More for ${n}" aria-expanded="${menuOpen}">${icon('more')}</button>
         ${menuOpen ? `<div class="menu-list" role="menu">
-          <button role="menuitem" data-action="copy" data-name="${n}">Copy wake topic</button>
+          ${h.watchOnly ? '' : `<button role="menuitem" data-action="copy" data-name="${n}">Copy wake topic</button>`}
           ${h.manual ? `<button role="menuitem" data-action="remove" data-name="${n}">${h.reportsState ? 'Unpin (keep while the board reports it)' : 'Remove'}</button>` : ''}
           <div class="note">${origin}</div>
         </div>` : ''}
@@ -483,6 +489,7 @@ function wakeSection(h) {
     case 'cancelled': return banner('note', 'info', 'Cancelled', 'The board stopped waiting. If the PC still starts, its dot turns green.', h.name);
     case 'timedOut': return banner('warn', 'warn', w.text ? w.text.charAt(0).toUpperCase() + w.text.slice(1) : 'No answer after 3 min', "Check that Wake-on-LAN is enabled in the PC's BIOS and network adapter, and that it's on wired power.", h.name);
     case 'failed': return banner('err', 'warn', "Couldn't send", w.reason, h.name);
+    case 'watchOnly': return banner('note', 'info', 'Only watched', "The board has no MAC for this PC, so it can't wake it. Add the MAC on the board to wake it from here.", h.name);
     default: return '';
   }
 }
