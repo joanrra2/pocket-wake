@@ -300,7 +300,7 @@ fun SettingsScreen(
 
             SectionTitle("About")
             Text(
-                "Pocket Wake ${BuildConfigInfo.versionName(androidx.compose.ui.platform.LocalContext.current)} (beta) · for the Pocket AdBlock board's Wake-on-LAN MQTT bridge.\n" +
+                "Pocket Wake ${BuildConfigInfo.versionName(androidx.compose.ui.platform.LocalContext.current)} · for the Pocket AdBlock board's Wake-on-LAN MQTT bridge.\n" +
                     "Connects only while the app is open. No analytics, no ads; nothing leaves the phone except the MQTT connection to your broker.\n" +
                     "Setup guide and bug reports: github.com/joanrra2/pocket-wake",
                 style = MaterialTheme.typography.bodySmall,

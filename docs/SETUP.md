@@ -1,8 +1,5 @@
 # Setup guide: from zero to waking your PC from your phone
 
-> **Pocket Wake is in beta.** It works end to end, but expect rough edges. Please report
-> problems in [Issues](https://github.com/joanrra2/pocket-wake/issues).
-
 About 20 minutes the first time. Prefer to watch first? Here is the whole setup in under
 two minutes ([MP4](media/wake-setup-en.mp4); en español: [GIF](media/wake-setup-es.gif) ·
 [MP4](media/wake-setup-es.mp4)). Every address, login and device in it is an example.

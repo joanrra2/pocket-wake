@@ -111,15 +111,6 @@ svg.i.sm { width: 18px; height: 18px; }
 .topbar h1 { margin: 0; font-size: 22px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
 .topbar .sub { font-size: 13px; color: var(--on-surface-variant); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.beta {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: .06em;
-  padding: 2px 8px;
-  border-radius: 99px;
-  background: var(--tertiary-container);
-  color: var(--on-tertiary-container);
-}
 
 .icon-btn {
   width: 44px; height: 44px;

@@ -1,11 +1,6 @@
 # Pocket Wake
 
-![Status: beta](https://img.shields.io/badge/status-beta-orange)
 [![Build](https://github.com/joanrra2/pocket-wake/actions/workflows/build.yml/badge.svg)](https://github.com/joanrra2/pocket-wake/actions/workflows/build.yml)
-
-> **Beta.** Pocket Wake works end to end, but it's new: expect rough edges, and please
-> report problems in [Issues](https://github.com/joanrra2/pocket-wake/issues). Settings may
-> need re-entering between beta versions.
 
 One-tap Wake-on-LAN for your PCs, from anywhere, through the MQTT bridge of a
 [Pocket AdBlock](https://github.com/joanrra2/pocket-adblock) board.
@@ -142,8 +137,8 @@ the unit tests with `node --test` inside `web/`.
 
 - **Debug builds**: every push builds `pocket-wake-debug-<n>`, under *Actions → Build →
   Artifacts* (unzip it to get the APK).
-- **Releases**: tags `v*` publish a signed APK on the *Releases* page. Beta tags such as
-  `v0.1.0-beta.1` are marked as pre-releases.
+- **Releases**: tags `v*` publish a signed APK on the *Releases* page. Tags with a
+  suffix, such as `v0.3.0-rc.1`, are marked as pre-releases.
 
 Allow "Install unknown apps" for your browser or file manager when Android asks.
 Debug and release builds install side by side (the debug one is "Pocket Wake (debug)").
@@ -198,7 +193,7 @@ under *Settings → Secrets and variables → Actions*. Base64 for the first sec
 Then push a tag:
 
 ```bash
-git tag v0.1.0-beta.1 && git push origin v0.1.0-beta.1
+git tag v0.3.0 && git push origin v0.3.0
 ```
 
 To sign locally instead, set `POCKETWAKE_KEYSTORE_FILE` (a path) and the three
