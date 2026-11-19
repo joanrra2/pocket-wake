@@ -623,7 +623,7 @@ private fun WakeSection(host: Host, now: Long, onDismiss: () -> Unit, onCancel: 
                 container = MaterialTheme.colorScheme.secondaryContainer,
                 content = MaterialTheme.colorScheme.onSecondaryContainer,
                 title = "Already online",
-                body = "The wake request was sent anyway.",
+                body = if (w.sent) "The wake request was sent anyway." else "The board checked it and sent nothing.",
                 onDismiss = onDismiss,
             )
             is WakeStatus.SentUnverified -> ResultBanner(

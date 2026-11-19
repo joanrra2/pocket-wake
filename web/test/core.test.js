@@ -310,7 +310,10 @@ test('board results end the wait', () => {
   assert.deepEqual(ok.lastWake, { at: t0, s: 41 });
   const none = C.onResult(boardWaiting(), PC, { kind: 'noAnswer', text: 'no answer after 10 min' }, t0 + 600000)[PC];
   assert.deepEqual(none.wake, { kind: 'timedOut', startedAt: t0, text: 'no answer after 10 min' });
-  assert.equal(C.onResult(boardWaiting(), PC, { kind: 'alreadyOnline' }, t0 + 1500)[PC].wake.kind, 'alreadyOnline');
+  const up = C.onResult(boardWaiting(), PC, { kind: 'alreadyOnline' }, t0 + 1500)[PC];
+  assert.deepEqual(up.wake, { kind: 'alreadyOnline', at: t0 + 1500, sent: false });
+  assert.equal(up.presence, 'online');
+  assert.equal(up.presenceSince, t0 + 1500);
 });
 
 test('cancel waits for the board, or gives up after a while', () => {

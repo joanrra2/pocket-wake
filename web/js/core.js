@@ -412,7 +412,14 @@ export function onResult(book, name, result, now, live = true) {
     case 'cancelled':
       return put(book, { ...h, wake: { kind: 'cancelled', at: now } });
     case 'alreadyOnline':
-      return put(book, { ...h, wake: { kind: 'alreadyOnline', at: now }, lastWake: { at: started, s: null } });
+      // The board marks the PC online without publishing its state topic, so do it here.
+      return put(book, {
+        ...h,
+        presence: 'online',
+        presenceSince: h.presence === 'online' ? h.presenceSince : now,
+        wake: { kind: 'alreadyOnline', at: now, sent: false },
+        lastWake: { at: started, s: null },
+      });
     default:
       return book;
   }

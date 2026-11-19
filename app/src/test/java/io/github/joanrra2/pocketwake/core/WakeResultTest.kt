@@ -73,7 +73,11 @@ class WakeResultTest {
         assertEquals("no answer after 10 min", (none.wake as WakeStatus.TimedOut).text)
         assertEquals(LastWake(t0, null), none.lastWake)
 
-        assertTrue(boardWaiting().onResult(pc, BoardResult.AlreadyOnline, t0 + 1_500)[pc]!!.wake is WakeStatus.AlreadyOnline)
+        val up = boardWaiting().onResult(pc, BoardResult.AlreadyOnline, t0 + 1_500)[pc]!!
+        assertEquals(WakeStatus.AlreadyOnline(t0 + 1_500, sent = false), up.wake)
+        // The board doesn't publish the state for this case.
+        assertEquals(Presence.ONLINE, up.presence)
+        assertEquals(t0 + 1_500, up.presenceSince)
     }
 
     @Test fun `cancel waits for the board, or gives up after a while`() {

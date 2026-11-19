@@ -79,7 +79,8 @@ sealed interface WakeStatus {
     data class SentUnverified(val at: Long) : WakeStatus
 
     /** The PC was already reported online when the request went out. */
-    data class AlreadyOnline(val at: Long) : WakeStatus
+    /** [sent]: false when the board itself found the PC online and sent nothing (firmware 0.6+). */
+    data class AlreadyOnline(val at: Long, val sent: Boolean = true) : WakeStatus
 
     /** [text]: the board's own result ("no answer after 10 min"), when it sent one. */
     data class TimedOut(val startedAt: Long, val text: String? = null) : WakeStatus
@@ -267,7 +268,15 @@ data class HostBook(
             is BoardResult.NoAnswer ->
                 put(h.copy(wake = WakeStatus.TimedOut(started, result.text), lastWake = LastWake(started, null)))
             BoardResult.Cancelled -> put(h.copy(wake = WakeStatus.Cancelled(now)))
-            BoardResult.AlreadyOnline -> put(h.copy(wake = WakeStatus.AlreadyOnline(now), lastWake = LastWake(started, null)))
+            // The board marks the PC online without publishing its state topic, so do it here.
+            BoardResult.AlreadyOnline -> put(
+                h.copy(
+                    presence = Presence.ONLINE,
+                    presenceSince = if (h.presence == Presence.ONLINE) h.presenceSince else now,
+                    wake = WakeStatus.AlreadyOnline(now, sent = false),
+                    lastWake = LastWake(started, null),
+                )
+            )
             else -> this
         }
     }

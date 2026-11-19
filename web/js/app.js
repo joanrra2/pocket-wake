@@ -478,7 +478,7 @@ function wakeSection(h) {
       </div>`;
     }
     case 'succeeded': return banner('ok', 'check', `Online after ${Format.seconds(C.wakeSeconds(w))}`, `Woken at ${Format.clock(now, w.startedAt)}`, h.name);
-    case 'alreadyOnline': return banner('note', 'info', 'Already online', 'The wake request was sent anyway.', h.name);
+    case 'alreadyOnline': return banner('note', 'info', 'Already online', w.sent === false ? 'The board checked it and sent nothing.' : 'The wake request was sent anyway.', h.name);
     case 'sentUnverified': return banner('note', 'info', 'Magic packet sent', "This PC has no IP on the board, so it can't confirm when it's up.", h.name);
     case 'cancelled': return banner('note', 'info', 'Cancelled', 'The board stopped waiting. If the PC still starts, its dot turns green.', h.name);
     case 'timedOut': return banner('warn', 'warn', w.text ? w.text.charAt(0).toUpperCase() + w.text.slice(1) : 'No answer after 3 min', "Check that Wake-on-LAN is enabled in the PC's BIOS and network adapter, and that it's on wired power.", h.name);
