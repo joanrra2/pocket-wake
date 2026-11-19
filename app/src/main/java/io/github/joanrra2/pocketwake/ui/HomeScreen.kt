@@ -82,7 +82,6 @@ import io.github.joanrra2.pocketwake.core.WAKE_TIMEOUT_MS
 import io.github.joanrra2.pocketwake.core.WakeStatus
 import io.github.joanrra2.pocketwake.mqtt.Connection
 import io.github.joanrra2.pocketwake.shortcut.WakeShortcuts
-import io.github.joanrra2.pocketwake.ui.components.BetaPill
 import io.github.joanrra2.pocketwake.ui.components.InfoRow
 import io.github.joanrra2.pocketwake.ui.components.Mono
 import io.github.joanrra2.pocketwake.ui.components.PowerAvatar
@@ -118,11 +117,7 @@ fun HomeScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Pocket Wake", style = MaterialTheme.typography.titleLarge)
-                            Spacer(Modifier.width(8.dp))
-                            BetaPill()
-                        }
+                        Text("Pocket Wake", style = MaterialTheme.typography.titleLarge)
                         if (configured) {
                             Text(
                                 ui.profile.host,

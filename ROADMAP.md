@@ -1,6 +1,6 @@
 # Roadmap
 
-Current status: **beta** (0.1.x), as an Android app and a web app (iPhone, iPad, any
+Current status: **0.2**, as an Android app and a web app (iPhone, iPad, any
 browser). The MVP covers one board, one-tap wake with confirmation, and setup with a connection
 test, plus QR setup from the board (Android scans it; on iPhone the camera opens the web
 app with the settings filled in). Below are the use cases the code is already shaped for, roughly in the order they

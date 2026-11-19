@@ -4,7 +4,7 @@ import * as C from './core.js';
 import * as Store from './store.js';
 import { openSession, testConnection } from './broker.js';
 
-const VERSION = '0.3.1-beta';
+const VERSION = '0.2.0';
 const { Topics, Format } = C;
 
 const state = {
@@ -311,7 +311,7 @@ function renderHome() {
   app.innerHTML = `
   <header class="topbar">
     <div class="titles">
-      <h1>Pocket Wake <span class="beta">BETA</span></h1>
+      <h1>Pocket Wake</h1>
       ${configured() ? `<div class="sub">${esc(state.profile.host)}</div>` : ''}
     </div>
     <button class="icon-btn" data-action="settings" aria-label="Broker settings">${icon('settings')}</button>
