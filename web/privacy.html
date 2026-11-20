@@ -21,14 +21,15 @@
 <code>joanrra2.github.io/pocket-wake</code>.</p>
 
 <h2>In short</h2>
-<p>Pocket Wake doesn't collect anything. There are no accounts, analytics, ads or crash
-reporting, and no server run by the developer. The app talks only to the MQTT broker
+<p>The developer of Pocket Wake receives nothing from the app. There are no accounts,
+analytics, ads or crash reporting, and no server run by the developer. The app talks only to the MQTT broker
 <strong>you</strong> enter, and keeps your settings on your own device.</p>
 
 <h2>What is sent, and where</h2>
 <ul>
 <li>The broker address, login and password you enter go to <strong>that broker only</strong>,
-over TLS, to connect. The developer never receives them.</li>
+over TLS (on by default; you can turn it off for a broker without TLS), to connect. The
+developer never receives them.</li>
 <li>Through the broker, the app sends wake and cancel requests for the PCs you choose, and
 (only if you use them) the ad-blocking switch and <em>Forget</em>. It receives what your
 Pocket AdBlock board publishes: PC names, online state, wake results and ad-blocking
@@ -75,14 +76,15 @@ Pocket Wake (<code>io.github.joanrra2.pocketwake</code>) y a la app web de
 <code>joanrra2.github.io/pocket-wake</code>.</p>
 
 <h2>En resumen</h2>
-<p>Pocket Wake no recoge nada. No hay cuentas, analíticas, anuncios ni informes de errores,
-ni ningún servidor del desarrollador. La app solo habla con el broker MQTT que <strong>tú</strong>
+<p>El desarrollador de Pocket Wake no recibe nada de la app. No hay cuentas, analíticas,
+anuncios ni informes de errores, ni ningún servidor del desarrollador. La app solo habla con el broker MQTT que <strong>tú</strong>
 indicas y guarda tus ajustes en tu propio dispositivo.</p>
 
 <h2>Qué se envía y adónde</h2>
 <ul>
 <li>La dirección, el usuario y la contraseña del broker van <strong>solo a ese broker</strong>,
-con TLS, para conectar. El desarrollador nunca los recibe.</li>
+con TLS (activado por defecto; puedes desactivarlo para un broker sin TLS), para conectar.
+El desarrollador nunca los recibe.</li>
 <li>A través del broker, la app envía las peticiones de encender y cancelar de los PC que
 eliges y (solo si los usas) el interruptor de bloqueo de anuncios y <em>Olvidar</em>. Recibe lo
 que publica tu placa Pocket AdBlock: nombres de los PC, si están encendidos, resultados del
@@ -115,7 +117,7 @@ envían.</li>
 
 <h2>Menores</h2>
 <p>Pocket Wake es una herramienta para gestionar tu propia red doméstica. No está dirigida a
-menores y no recoge datos de nadie.</p>
+menores, y el desarrollador no recibe datos de nadie.</p>
 
 <h2>Cambios y contacto</h2>
 <p>Los cambios en esta política se publican en esta página y en el

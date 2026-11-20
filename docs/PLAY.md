@@ -46,15 +46,21 @@ The certificate's SHA-256, for checking that the Console shows the right key, is
 | App access | Some functionality is restricted: see [Reviewer access](#reviewer-access) |
 | Content rating | Category *Utility, productivity, communication or other*; *No* to every content question |
 | Target audience | 18 and over (keeps the app out of the Families policy) |
-| Data safety | No data collected, no data shared (see below) |
+| Data safety | Data collected (User IDs, Other actions), none shared (see below) |
 | News app / government app / health / financial features | No |
 
-**Data safety.** The app sends the broker login and wake requests only to a broker the
-user enters. Nothing reaches the developer or any service the developer chose, and there
-are no SDKs that send data. Answer *No* to "Does your app collect or share any of the
-required user data types?". Under security practices: data is encrypted in transit (TLS),
-and users can delete it by uninstalling the app. The form's own help text has the final
-word on the definitions; re-read it when submitting.
+**Data safety.** Google counts any data that leaves the phone as "collected", even
+when it goes only to a server the user chose and the developer never sees it. So the
+broker login and the wake requests are declared, though they reach only the user's own
+broker:
+
+- *Collects or shares required data:* Yes. *Accounts:* none in the app; users sign in
+  with a broker login created elsewhere ("Other: the user's own MQTT broker login").
+- *Personal info → User IDs* and *App activity → Other actions*: collected, not shared,
+  not ephemeral, required, for *App functionality*.
+- *Encrypted in transit:* **No**, because Settings lets you turn TLS off for a broker
+  without it. The store then shows "Data isn't encrypted". Making TLS mandatory in the
+  app would allow answering Yes.
 
 ### 5. Store listing
 
@@ -77,8 +83,9 @@ To redraw the screenshots after a UI change, run:
 ./gradlew recordRoborazziDebug --tests '*ScreenshotTest.play*'
 ```
 
-Still to make by hand: the **512 × 512 app icon** (`web/icons/icon-512.png` is a start)
-and the **1024 × 500 feature graphic**.
+The store icon (`images/icon.png`, a copy of `web/icons/maskable-512.png`: Play rounds
+the corners itself) and the feature graphic (`images/featureGraphic.png`, 1024 × 500)
+are in the same folder.
 
 ### 6. Closed test (personal accounts only)
 

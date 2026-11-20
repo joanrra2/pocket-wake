@@ -25,7 +25,7 @@ Rápida de usar
 
 Privada por diseño
 • Sin cuentas, analíticas, anuncios ni rastreadores. Nada llega al desarrollador.
-• La app solo habla con el broker que indicas, con TLS verificado frente a las autoridades de certificación de confianza de Android.
+• La app solo habla con el broker que indicas, con TLS (activado por defecto), verificado frente a las autoridades de certificación de confianza de Android.
 • La contraseña del broker se cifra con una clave guardada en el Android Keystore. Las copias de seguridad de la app están desactivadas.
 • La cámara solo se usa al tocar Escanear; las imágenes se procesan en el teléfono.
 • Sin servicio en segundo plano: la app solo se conecta mientras está abierta.

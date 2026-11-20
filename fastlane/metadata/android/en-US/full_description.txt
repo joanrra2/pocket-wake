@@ -25,7 +25,7 @@ Quick to use
 
 Private by design
 • No accounts, analytics, ads or trackers. Nothing goes to the developer.
-• The app talks only to the broker you enter, over TLS verified against Android's trusted certificate authorities.
+• The app talks only to the broker you enter, over TLS (on by default), verified against Android's trusted certificate authorities.
 • The broker password is encrypted with a key held in the Android Keystore. App backups are off.
 • The camera is used only when you tap Scan; frames are decoded on the phone.
 • No background service: the app connects only while it is open.
