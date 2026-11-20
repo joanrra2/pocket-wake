@@ -1,0 +1,34 @@
+Pocket Wake turns on the computers at home from wherever you are, with one tap.
+
+It works with a Pocket AdBlock board on your home network. The phone sends the request to an MQTT broker of your choice (for example a free EMQX Cloud Serverless broker); the board picks it up, sends the Wake-on-LAN magic packet on your network, checks that the PC answers, and the app shows "Online after 23 s".
+
+What you need
+• A Pocket AdBlock board connected to your home network, with Remote wake (MQTT) turned on.
+• An MQTT broker with TLS, and a login for the phone.
+• A PC with Wake-on-LAN turned on (wired Ethernet).
+The setup guide walks through all of it: https://github.com/joanrra2/pocket-wake/blob/main/docs/SETUP.md
+
+What it shows
+• Connection status, and why it can't connect: wrong password, untrusted certificate, wrong port.
+• Whether the board is online.
+• One card per PC with its online dot. PCs that have an IP on the board appear by themselves; others can be added by name.
+• Wake progress and the result: "Online after 41 s", "Already online", or a hint when nothing answers. With board firmware 0.6 or later, the board's own wait per PC, a Cancel button, and wakes started from Home Assistant or another phone.
+• Watch-only devices (a NAS, a printer): online dot, no Wake button.
+• When each PC was last woken.
+• The board's blocking switch, statistics, uptime and last restart, if your broker login is allowed to read them.
+
+Quick to use
+• Scan the QR code on the board's setup page to fill in the broker address, port and topic prefix.
+• Test connection checks the login, TLS, the board and the broker's access rules before you save.
+• Long-press the app icon for the last woken PCs, or add a PC's own icon to the home screen.
+• Tasker and NFC tags can ask the app to wake a PC; it always asks you to confirm.
+
+Private by design
+• No accounts, analytics, ads or trackers. Nothing goes to the developer.
+• The app talks only to the broker you enter, over TLS verified against Android's trusted certificate authorities.
+• The broker password is encrypted with a key held in the Android Keystore. App backups are off.
+• The camera is used only when you tap Scan; frames are decoded on the phone.
+• No background service: the app connects only while it is open.
+
+Open source: https://github.com/joanrra2/pocket-wake
+Privacy policy: https://joanrra2.github.io/pocket-wake/privacy.html

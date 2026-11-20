@@ -76,10 +76,17 @@ class ScreenshotTest {
         stats = BoardStats(blocked = 1834, allowed = 4127, percent = 30.7, domains = 139_651, clients = 6, at = now - 40_000, uptime = 367_200, restart = "power on"),
     )
 
-    private fun shot(name: String, dark: Boolean = false, content: @Composable () -> Unit) {
+    private fun shot(name: String, dark: Boolean = false, dir: String = "../docs/screenshots", content: @Composable () -> Unit) {
         compose.setContent { PocketWakeTheme(dark = dark, dynamic = false, content = content) }
-        compose.onRoot().captureRoboImage("../docs/screenshots/$name.png")
+        compose.onRoot().captureRoboImage("$dir/$name.png")
     }
+
+    // Google Play phone screenshots: 1080 × 1920 (9:16; Play refuses anything taller than
+    // 2:1). Saved where Play's and F-Droid's listing tools read them; the number is the order.
+    private val play = "../fastlane/metadata/android/en-US/images/phoneScreenshots"
+
+    /** Home without the ad-blocking card, so the PCs fit on one phone screen. */
+    private fun wakeOnly() = connected().copy(blocking = Blocking(), stats = null)
 
     private val noop: (String) -> Unit = {}
 
@@ -92,11 +99,25 @@ class ScreenshotTest {
 
     @Test fun setup() = shot("setup") { Home(UiState(now = now)) }
 
+    @Test @Config(qualifiers = "w360dp-h640dp-xxhdpi") fun play1Home() = shot("1_home", dir = play) { Home(wakeOnly()) }
+
+    @Test @Config(qualifiers = "w360dp-h640dp-night-xxhdpi") fun play2HomeDark() =
+        shot("2_home_dark", dark = true, dir = play) { Home(wakeOnly()) }
+
+    @Test @Config(qualifiers = "w360dp-h640dp-xxhdpi") fun play4Board() = shot("4_board", dir = play) { Home(connected()) }
+
+    @Test @Config(qualifiers = "w360dp-h640dp-xxhdpi") fun play5Setup() = shot("5_setup", dir = play) { Home(UiState(now = now)) }
+
     @Test fun cantConnect() = shot("cant-connect") {
         Home(connected().copy(connection = Connection.Failed("Wrong username or password"), board = BoardState()))
     }
 
-    @Test @Config(qualifiers = "w400dp-h1240dp-xxhdpi") fun settings() = shot("settings") {
+    @Test @Config(qualifiers = "w400dp-h1240dp-xxhdpi") fun settings() = shot("settings") { Settings() }
+
+    @Test @Config(qualifiers = "w360dp-h640dp-xxhdpi") fun play3Settings() = shot("3_settings", dir = play) { Settings() }
+
+    @Composable
+    private fun Settings() =
         SettingsScreen(
             ui = UiState(
                 profile = profile,
@@ -113,5 +134,4 @@ class ScreenshotTest {
             onTest = {},
             onBack = {},
         )
-    }
 }

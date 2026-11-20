@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>Pocket Wake privacy policy</title>
+<meta name="description" content="What the Pocket Wake app and web app store, send and ask for.">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/privacy.css">
+</head>
+<body>
+<main>
+<p class="lang"><a href="#es" hreflang="es">Español</a></p>
+
+<article lang="en">
+<h1>Pocket Wake privacy policy</h1>
+<p class="muted">Last updated: 20 November 2026. Applies to the Pocket Wake Android app
+(<code>io.github.joanrra2.pocketwake</code>) and the web app at
+<code>joanrra2.github.io/pocket-wake</code>.</p>
+
+<h2>In short</h2>
+<p>Pocket Wake doesn't collect anything. There are no accounts, analytics, ads or crash
+reporting, and no server run by the developer. The app talks only to the MQTT broker
+<strong>you</strong> enter, and keeps your settings on your own device.</p>
+
+<h2>What is sent, and where</h2>
+<ul>
+<li>The broker address, login and password you enter go to <strong>that broker only</strong>,
+over TLS, to connect. The developer never receives them.</li>
+<li>Through the broker, the app sends wake and cancel requests for the PCs you choose, and
+(only if you use them) the ad-blocking switch and <em>Forget</em>. It receives what your
+Pocket AdBlock board publishes: PC names, online state, wake results and ad-blocking
+statistics.</li>
+<li>Your broker provider handles that traffic under its own privacy policy.</li>
+<li>Nothing else leaves the device.</li>
+</ul>
+
+<h2>What is kept on your device</h2>
+<ul>
+<li>Broker settings: address, port, login, topic prefix.</li>
+<li>The broker password, encrypted with AES-256-GCM. On Android the key is in the Android
+Keystore. In the web app the password is kept only if you choose that, and its key can't be
+exported from the browser.</li>
+<li>PCs you added by name, and when each PC was last woken. On Android, also the PCs shown
+as launcher shortcuts.</li>
+</ul>
+<p>Android app backups are turned off, so none of this is copied to Google Drive or to a new
+phone. Uninstalling the app, or clearing the site's data in your browser, deletes all of
+it.</p>
+
+<h2>Permissions (Android)</h2>
+<ul>
+<li><strong>Internet</strong>, to reach your broker.</li>
+<li><strong>Camera</strong>, asked for only when you tap <em>Scan</em> to read your board's
+setup QR code. Frames are decoded on the phone and never stored or sent anywhere.</li>
+</ul>
+<p>The app has no background service. It connects only while it is open.</p>
+
+<h2>Children</h2>
+<p>Pocket Wake is a tool for managing your own home network. It isn't directed at children
+and collects no data from anyone.</p>
+
+<h2>Changes and contact</h2>
+<p>Changes to this policy are published on this page and in the app's
+<a href="https://github.com/joanrra2/pocket-wake">source repository</a>. Questions:
+<a href="https://github.com/joanrra2/pocket-wake/issues">open an issue</a>.</p>
+</article>
+
+<article lang="es" id="es">
+<h1>Política de privacidad de Pocket Wake</h1>
+<p class="muted">Última actualización: 20 de noviembre de 2026. Se aplica a la app de Android
+Pocket Wake (<code>io.github.joanrra2.pocketwake</code>) y a la app web de
+<code>joanrra2.github.io/pocket-wake</code>.</p>
+
+<h2>En resumen</h2>
+<p>Pocket Wake no recoge nada. No hay cuentas, analíticas, anuncios ni informes de errores,
+ni ningún servidor del desarrollador. La app solo habla con el broker MQTT que <strong>tú</strong>
+indicas y guarda tus ajustes en tu propio dispositivo.</p>
+
+<h2>Qué se envía y adónde</h2>
+<ul>
+<li>La dirección, el usuario y la contraseña del broker van <strong>solo a ese broker</strong>,
+con TLS, para conectar. El desarrollador nunca los recibe.</li>
+<li>A través del broker, la app envía las peticiones de encender y cancelar de los PC que
+eliges y (solo si los usas) el interruptor de bloqueo de anuncios y <em>Olvidar</em>. Recibe lo
+que publica tu placa Pocket AdBlock: nombres de los PC, si están encendidos, resultados del
+encendido y estadísticas de bloqueo.</li>
+<li>Tu proveedor de broker trata ese tráfico según su propia política de privacidad.</li>
+<li>Nada más sale del dispositivo.</li>
+</ul>
+
+<h2>Qué se guarda en tu dispositivo</h2>
+<ul>
+<li>Los ajustes del broker: dirección, puerto, usuario y prefijo de los temas.</li>
+<li>La contraseña del broker, cifrada con AES-256-GCM. En Android la clave está en el
+Android Keystore. En la app web la contraseña solo se guarda si lo eliges, y su clave no se
+puede extraer del navegador.</li>
+<li>Los PC que añadiste por nombre y cuándo se encendió cada uno por última vez. En Android,
+también los PC que aparecen como accesos directos.</li>
+</ul>
+<p>Las copias de seguridad de la app de Android están desactivadas, así que nada de esto se
+copia a Google Drive ni a un teléfono nuevo. Al desinstalar la app, o al borrar los datos del
+sitio en el navegador, se borra todo.</p>
+
+<h2>Permisos (Android)</h2>
+<ul>
+<li><strong>Internet</strong>, para llegar a tu broker.</li>
+<li><strong>Cámara</strong>, solo cuando tocas <em>Escanear</em> para leer el código QR de
+configuración de tu placa. Las imágenes se procesan en el teléfono y nunca se guardan ni se
+envían.</li>
+</ul>
+<p>La app no tiene ningún servicio en segundo plano. Solo se conecta mientras está abierta.</p>
+
+<h2>Menores</h2>
+<p>Pocket Wake es una herramienta para gestionar tu propia red doméstica. No está dirigida a
+menores y no recoge datos de nadie.</p>
+
+<h2>Cambios y contacto</h2>
+<p>Los cambios en esta política se publican en esta página y en el
+<a href="https://github.com/joanrra2/pocket-wake">repositorio del código</a>. Preguntas:
+<a href="https://github.com/joanrra2/pocket-wake/issues">abre una incidencia</a>.</p>
+</article>
+</main>
+</body>
+</html>
