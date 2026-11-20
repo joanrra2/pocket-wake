@@ -1,0 +1,34 @@
+Pocket Wake enciende los ordenadores de casa desde donde estés, con un toque. (Por ahora la app está en inglés.)
+
+Funciona con una placa Pocket AdBlock en tu red doméstica. El teléfono envía la petición a un broker MQTT que tú eliges (por ejemplo, un broker gratuito EMQX Cloud Serverless); la placa la recibe, envía el paquete mágico Wake-on-LAN en tu red, comprueba que el PC responde y la app muestra «Encendido en 23 s».
+
+Qué necesitas
+• Una placa Pocket AdBlock conectada a tu red doméstica, con el encendido remoto (MQTT) activado.
+• Un broker MQTT con TLS y un usuario para el teléfono.
+• Un PC con Wake-on-LAN activado (con cable Ethernet).
+La guía de configuración lo explica paso a paso: https://github.com/joanrra2/pocket-wake/blob/main/docs/SETUP.md
+
+Qué muestra
+• El estado de la conexión y por qué no conecta: contraseña incorrecta, certificado no fiable, puerto equivocado.
+• Si la placa está en línea.
+• Una tarjeta por PC con su punto de estado. Los PC que tienen IP en la placa aparecen solos; los demás se pueden añadir por nombre.
+• El progreso del encendido y el resultado: «Encendido en 41 s», «Ya estaba encendido» o una pista si nada responde. Con el firmware 0.6 o posterior, la espera de cada PC según la placa, un botón Cancelar y los encendidos iniciados desde Home Assistant u otro teléfono.
+• Dispositivos solo de vigilancia (un NAS, una impresora): punto de estado, sin botón de encender.
+• Cuándo se encendió cada PC por última vez.
+• El interruptor de bloqueo de la placa, sus estadísticas, el tiempo encendida y el último reinicio, si tu usuario del broker puede leerlos.
+
+Rápida de usar
+• Escanea el código QR de la página de configuración de la placa para rellenar la dirección del broker, el puerto y el prefijo.
+• Probar conexión comprueba el usuario, el TLS, la placa y las reglas de acceso del broker antes de guardar.
+• Mantén pulsado el icono de la app para ver los últimos PC encendidos, o añade el icono propio de un PC a la pantalla de inicio.
+• Tasker y las etiquetas NFC pueden pedir a la app que encienda un PC; siempre te pide confirmación.
+
+Privada por diseño
+• Sin cuentas, analíticas, anuncios ni rastreadores. Nada llega al desarrollador.
+• La app solo habla con el broker que indicas, con TLS (activado por defecto), verificado frente a las autoridades de certificación de confianza de Android.
+• La contraseña del broker se cifra con una clave guardada en el Android Keystore. Las copias de seguridad de la app están desactivadas.
+• La cámara solo se usa al tocar Escanear; las imágenes se procesan en el teléfono.
+• Sin servicio en segundo plano: la app solo se conecta mientras está abierta.
+
+Código abierto: https://github.com/joanrra2/pocket-wake
+Política de privacidad: https://joanrra2.github.io/pocket-wake/privacy.html

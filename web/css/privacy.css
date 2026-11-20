@@ -1,0 +1,43 @@
+/* Privacy policy page: same colours as the app, plain reading layout. */
+:root {
+  --primary: #00696b;
+  --bg: #f4fbfa;
+  --surface: #e8efee;
+  --on-surface: #161d1d;
+  --on-surface-variant: #3f4949;
+  --outline-variant: #bec8c8;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary: #80d4d5;
+    --bg: #0e1515;
+    --surface: #1a2121;
+    --on-surface: #dde4e3;
+    --on-surface-variant: #bec8c8;
+    --outline-variant: #3f4949;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--on-surface);
+  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+main { max-width: 42rem; margin: 0 auto; padding: 24px 16px 64px; }
+h1 { font-size: 1.75rem; line-height: 1.25; margin: 0 0 8px; }
+h2 { font-size: 1.15rem; margin: 28px 0 8px; }
+a { color: var(--primary); }
+code {
+  font: .9em ui-monospace, "Cascadia Mono", Menlo, monospace;
+  background: var(--surface);
+  padding: 1px 5px;
+  border-radius: 6px;
+  overflow-wrap: anywhere;
+}
+ul { padding-left: 1.25rem; }
+li + li { margin-top: 6px; }
+.muted { color: var(--on-surface-variant); font-size: .9rem; }
+.lang { text-align: right; margin: 0; font-size: .9rem; }
+article + article { margin-top: 56px; padding-top: 32px; border-top: 1px solid var(--outline-variant); }
