@@ -20,11 +20,17 @@ class SettingsRepository(context: Context) {
     fun loadProfile(): Profile = Profile(
         host = prefs.getString(K_HOST, "") ?: "",
         port = prefs.getInt(K_PORT, Profile.DEFAULT_TLS_PORT),
-        tls = prefs.getBoolean(K_TLS, true),
         username = prefs.getString(K_USER, "") ?: "",
         password = prefs.getString(K_PASS, null)?.let { secrets.decrypt(it) } ?: "",
         prefix = prefs.getString(K_PREFIX, Topics.DEFAULT_PREFIX) ?: Topics.DEFAULT_PREFIX,
     )
+
+    /**
+     * True when these settings were saved by an older version with TLS turned off. The app
+     * now always connects with TLS, so the user is told why the old port stopped working.
+     * Saving the settings again clears it.
+     */
+    fun savedWithoutTls(): Boolean = !prefs.getBoolean(K_TLS, true)
 
     /** True when a password was saved but can no longer be decrypted. */
     fun passwordLost(): Boolean = prefs.getString(K_PASS, null)?.let { secrets.decrypt(it) == null } ?: false
@@ -34,7 +40,7 @@ class SettingsRepository(context: Context) {
         prefs.edit {
             putString(K_HOST, n.host)
             putInt(K_PORT, n.port)
-            putBoolean(K_TLS, n.tls)
+            remove(K_TLS) // older versions stored a TLS switch; TLS is now always on
             putString(K_USER, n.username)
             if (n.password.isEmpty()) remove(K_PASS) else putString(K_PASS, secrets.encrypt(n.password))
             putString(K_PREFIX, n.prefix)

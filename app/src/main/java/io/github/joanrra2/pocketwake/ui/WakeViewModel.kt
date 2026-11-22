@@ -40,6 +40,8 @@ data class BoardState(val presence: Presence = Presence.UNKNOWN, val since: Long
 data class UiState(
     val profile: Profile = Profile(),
     val passwordLost: Boolean = false,
+    /** Saved by an older version with TLS off; see [SettingsRepository.savedWithoutTls]. */
+    val savedWithoutTls: Boolean = false,
     val connection: Connection = Connection.Idle,
     val board: BoardState = BoardState(),
     val book: HostBook = HostBook(),
@@ -75,7 +77,7 @@ class WakeViewModel(app: Application) : AndroidViewModel(app), DefaultLifecycleO
     init {
         val profile = repo.loadProfile()
         val book = HostBook().withManual(repo.loadManualHosts()).withLastWakes(repo.loadLastWakes())
-        _ui.value = UiState(profile = profile, passwordLost = repo.passwordLost(), book = book)
+        _ui.value = UiState(profile = profile, passwordLost = repo.passwordLost(), savedWithoutTls = repo.savedWithoutTls(), book = book)
         ProcessLifecycleOwner.get().lifecycle.addObserver(this)
     }
 
@@ -312,6 +314,7 @@ class WakeViewModel(app: Application) : AndroidViewModel(app), DefaultLifecycleO
             it.copy(
                 profile = n,
                 passwordLost = false,
+                savedWithoutTls = false,
                 book = if (brokerChanged) it.book.forgetDiscovered() else it.book,
                 board = if (brokerChanged) BoardState() else it.board,
                 blocking = if (brokerChanged) Blocking() else it.blocking,

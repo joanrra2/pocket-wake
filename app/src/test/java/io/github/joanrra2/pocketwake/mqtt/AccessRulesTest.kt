@@ -23,20 +23,19 @@ class AccessRulesTest {
     private fun profile(user: String) = Profile(
         host = broker!!.substringBefore(':'),
         port = broker.substringAfter(':').toInt(),
-        tls = false,
         username = user,
         password = "x",
     )
 
     @Test fun `full login sees the blocking switch`() = runBlocking {
-        val r = ConnectionTest.run(profile("pocket-phone"), "pocketwake-acl-test")
+        val r = ConnectionTest.run(profile("pocket-phone"), "pocketwake-acl-test", 2500, plainTcpForTests = true)
         assertNull(r.error)
         assertEquals(emptyList<String>(), r.denied)
         assertEquals(true, r.blocking)
     }
 
     @Test fun `refused topics are reported`() = runBlocking {
-        val r = ConnectionTest.run(profile("limited"), "pocketwake-acl-test")
+        val r = ConnectionTest.run(profile("limited"), "pocketwake-acl-test", 2500, plainTcpForTests = true)
         assertNull(r.error)
         assertEquals(listOf("sinkhole/blocking", "sinkhole/stats"), r.denied)
         assertEquals(emptyList<String>(), r.deniedRequired("sinkhole"))

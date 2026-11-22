@@ -57,8 +57,9 @@ home network, checks that the PC answers, and the app shows **Online after 23 s*
   service: the app connects only while it is open and disconnects when you leave it.
 - The broker password is encrypted (AES-256-GCM) with a key held in the Android Keystore.
   App backups are disabled.
-- TLS is verified against Android's trusted certificate authorities with hostname
-  checking. There is no "accept any certificate" option.
+- Always TLS: the app has no unencrypted mode, so brokers without TLS aren't supported.
+  The certificate is verified against Android's trusted certificate authorities with
+  hostname checking. There is no "accept any certificate" option.
 
 ## Setup
 
@@ -80,7 +81,7 @@ In short:
    *Wake → Add a computer* with its name, MAC and (for the online dot) its IP.
 4. **App**: *Set up broker* → **Scan** the QR code on the board's *Wake-on-LAN → Phone app*
    card (address, port and prefix fill in), then type the **phone** login's password. Or
-   fill it in by hand: broker address (host only), port 8883, TLS on, the phone login, the
+   fill it in by hand: broker address (host only), port 8883, the phone login, the
    same prefix. *Test connection*, *Save*, then **Wake**.
 
 ### Topics used

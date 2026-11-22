@@ -35,14 +35,21 @@ data class Message(val topic: String, val payload: String, val retained: Boolean
  * CAs; the EMQX Cloud chain ends at DigiCert Global Root G2), SNI from the host name, and
  * HTTPS-style hostname verification in the TLS engine (HiveMQ falls back to the platform
  * HostnameVerifier where the engine can't do it). No certificate pinning or trust-all.
+ *
+ * The app always connects with TLS. [plainTcpForTests] exists only for the opt-in
+ * AccessRulesTest against a local broker; no app code passes it.
  */
-internal fun buildClient(profile: Profile, clientId: String): com.hivemq.client.mqtt.mqtt3.Mqtt3ClientBuilder {
+internal fun buildClient(
+    profile: Profile,
+    clientId: String,
+    plainTcpForTests: Boolean = false,
+): com.hivemq.client.mqtt.mqtt3.Mqtt3ClientBuilder {
     val transport = MqttClientTransportConfig.builder()
         .serverHost(profile.host)
         .serverPort(profile.port)
         .socketConnectTimeout(10, TimeUnit.SECONDS)
         .mqttConnectTimeout(10, TimeUnit.SECONDS)
-        .let { b -> if (profile.tls) b.sslConfig(MqttClientSslConfig.builder().build()) else b }
+        .let { b -> if (plainTcpForTests) b else b.sslConfig(MqttClientSslConfig.builder().build()) }
         .build()
     return MqttClient.builder()
         .useMqttVersion3()

@@ -124,7 +124,6 @@ class ScreenshotTest {
                 now = now,
                 testReport = TestReport(
                     connectMillis = 412,
-                    tls = true,
                     board = Presence.ONLINE,
                     hosts = mapOf("DESKTOP" to Presence.OFFLINE, "GAMING-PC" to Presence.OFFLINE, "NAS" to Presence.ONLINE),
                     blocking = true,

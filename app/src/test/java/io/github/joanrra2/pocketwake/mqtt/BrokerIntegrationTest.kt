@@ -35,8 +35,8 @@ class BrokerIntegrationTest {
 
     @Before fun optIn() = assumeTrue(System.getenv("POCKETWAKE_IT") == "1")
 
-    private fun profile(port: Int = 8883, tls: Boolean = true, h: String = host) =
-        Profile(host = h, port = port, tls = tls, prefix = prefix)
+    private fun profile(port: Int = 8883, h: String = host) =
+        Profile(host = h, port = port, prefix = prefix)
 
     @Test fun `wake flow against a fake board over TLS`() = runBlocking {
         // Fake board: status online, PC offline, and wakes the PC 2 s after a set message.
@@ -113,7 +113,7 @@ class BrokerIntegrationTest {
     }
 
     @Test fun `tls to a plain port explains the mismatch`(): Unit = runBlocking {
-        val r = ConnectionTest.run(profile(port = 1883, tls = true), "$prefix-plain", listenMillis = 0)
+        val r = ConnectionTest.run(profile(port = 1883), "$prefix-plain", listenMillis = 0)
         assertTrue(r.error, r.error!!.contains("TLS port"))
     }
 

@@ -19,7 +19,7 @@ class ProfileAndFormatTest {
         val p = Profile(host = "abc.emqxsl.com", username = "phone", password = "x")
         assertTrue(p.isConfigured)
         assertEquals(8883, p.port)
-        assertTrue(p.tls)
+        assertEquals("MQTT over TLS · port 8883", p.transportLabel)
         assertEquals("sinkhole", p.prefix)
     }
 
@@ -37,11 +37,6 @@ class ProfileAndFormatTest {
         assertEquals("sinkhole", p.prefix)
     }
 
-    @Test fun `tls toggle swaps default ports only`() {
-        assertEquals(1883, Profile.portAfterTlsToggle(8883, tls = false))
-        assertEquals(8883, Profile.portAfterTlsToggle(1883, tls = true))
-        assertEquals(9001, Profile.portAfterTlsToggle(9001, tls = false))
-    }
 
     @Test fun `formats durations`() {
         assertEquals("0 s", Format.seconds(0))

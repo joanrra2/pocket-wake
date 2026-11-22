@@ -4,7 +4,7 @@ It works with a Pocket AdBlock board on your home network. The phone sends the r
 
 What you need
 • A Pocket AdBlock board connected to your home network, with Remote wake (MQTT) turned on.
-• An MQTT broker with TLS, and a login for the phone.
+• An MQTT broker with TLS (required), and a login for the phone.
 • A PC with Wake-on-LAN turned on (wired Ethernet).
 The setup guide walks through all of it: https://github.com/joanrra2/pocket-wake/blob/main/docs/SETUP.md
 
@@ -25,7 +25,7 @@ Quick to use
 
 Private by design
 • No accounts, analytics, ads or trackers. Nothing goes to the developer.
-• The app talks only to the broker you enter, over TLS (on by default), verified against Android's trusted certificate authorities.
+• The app talks only to the broker you enter, always over TLS, verified against Android's trusted certificate authorities.
 • The broker password is encrypted with a key held in the Android Keystore. App backups are off.
 • The camera is used only when you tap Scan; frames are decoded on the phone.
 • No background service: the app connects only while it is open.
