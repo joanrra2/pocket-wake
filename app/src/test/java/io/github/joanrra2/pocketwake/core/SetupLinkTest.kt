@@ -2,7 +2,6 @@ package io.github.joanrra2.pocketwake.core
 
 import io.github.joanrra2.pocketwake.scan.QrDecoder
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -19,7 +18,6 @@ class SetupLinkTest {
         )
         assertEquals("x1.ala.eu-central-1.emqxsl.com", l.host)
         assertEquals(8883, l.port)
-        assertTrue(l.tls)
         assertEquals("sinkhole", l.prefix)
         assertEquals("phone", l.username)
         assertEquals(8084, l.wsPort)
@@ -27,13 +25,17 @@ class SetupLinkTest {
     }
 
     @Test fun `fills defaults and decodes escapes`() {
-        val l = ok("#setup?host=broker.lan&tls=0&prefix=home%2Fwake%2F&user=")
-        assertEquals(1883, l.port)
-        assertFalse(l.tls)
+        val l = ok("#setup?host=broker.lan&prefix=home%2Fwake%2F&user=")
+        assertEquals(8883, l.port)
         assertEquals("home/wake", l.prefix)
         assertNull(l.username)
         assertNull(l.wsPort)
         assertEquals(8883, ok("#setup?host=b").port)
+    }
+
+    @Test fun `refuses a board whose broker has no TLS`() {
+        val msg = error("#setup?v=1&host=broker.example.com&port=1883&tls=0&prefix=home%2Fwake")
+        assertTrue(msg, msg.startsWith("This board uses a broker without TLS"))
     }
 
     @Test fun `rejects other codes and bad values`() {

@@ -8,12 +8,12 @@ import java.net.URLDecoder
  * The code is a link to the web app, so an iPhone camera opens it directly:
  * `https://joanrra2.github.io/pocket-wake/#setup?v=1&host=…&port=8883&tls=1&wsport=8084&wspath=%2Fmqtt&prefix=sinkhole&user=…`
  *
- * It never carries a password: that is typed on the phone.
+ * It never carries a password: that is typed on the phone. A code for a broker without
+ * TLS (`tls=0`) is refused: the app only connects with TLS.
  */
 data class SetupLink(
     val host: String,
     val port: Int,
-    val tls: Boolean,
     val prefix: String,
     val username: String?,
     val wsPort: Int?,
@@ -26,7 +26,6 @@ data class SetupLink(
         return p.copy(
             host = host,
             port = port,
-            tls = tls,
             prefix = prefix,
             username = user,
             password = if (samePlace) p.password else "",
@@ -59,9 +58,13 @@ data class SetupLink(
             if (host.isEmpty() || host.any { it.isWhitespace() || it == '/' }) {
                 return Result.Error("The setup code has no valid broker address")
             }
-            val tls = params["tls"] != "0"
-            val port = params["port"]?.toIntOrNull()
-                ?: if (tls) Profile.DEFAULT_TLS_PORT else Profile.DEFAULT_PLAIN_PORT
+            if (params["tls"] == "0") {
+                return Result.Error(
+                    "This board uses a broker without TLS. Pocket Wake only connects with TLS: " +
+                        "set the board's Broker URI to mqtts:// (port 8883)",
+                )
+            }
+            val port = params["port"]?.toIntOrNull() ?: Profile.DEFAULT_TLS_PORT
             if (port !in 1..65535) return Result.Error("The setup code has an invalid port")
             val prefix = Topics.normalizePrefix(params["prefix"] ?: Topics.DEFAULT_PREFIX)
             Topics.prefixError(prefix)?.let { return Result.Error("The setup code has an invalid prefix: $it") }
@@ -70,7 +73,6 @@ data class SetupLink(
                 SetupLink(
                     host = host,
                     port = port,
-                    tls = tls,
                     prefix = prefix,
                     username = params["user"]?.trim()?.takeIf { it.isNotEmpty() },
                     wsPort = wsPort,

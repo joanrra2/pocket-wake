@@ -58,9 +58,9 @@ broker:
   with a broker login created elsewhere ("Other: the user's own MQTT broker login").
 - *Personal info → User IDs* and *App activity → Other actions*: collected, not shared,
   not ephemeral, required, for *App functionality*.
-- *Encrypted in transit:* **No**, because Settings lets you turn TLS off for a broker
-  without it. The store then shows "Data isn't encrypted". Making TLS mandatory in the
-  app would allow answering Yes.
+- *Encrypted in transit:* **Yes**. The app always connects with TLS (from the version
+  after 0.2.0; 0.2.0 still had a TLS switch, so this answer needs a release built from
+  the change that removed it).
 
 ### 5. Store listing
 
@@ -127,7 +127,7 @@ answers on it.
 
   > Pocket Wake controls a Pocket AdBlock board through an MQTT broker. A demo board is
   > online for review. Open the app → *Set up broker*, and enter: Broker address
-  > `<host>`, Port `8883`, TLS on, Username `play-review`, Password `<password>`, Topic
+  > `<host>`, Port `8883`, Username `play-review`, Password `<password>`, Topic
   > prefix `demo`. Tap *Test connection*, then *Save*. The home screen lists the demo
   > PCs; tap *Wake* on one to send a wake request and follow its progress.
 

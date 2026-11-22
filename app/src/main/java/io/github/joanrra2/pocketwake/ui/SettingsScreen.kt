@@ -33,7 +33,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -76,7 +75,6 @@ fun SettingsScreen(
     val saved = ui.profile
     var host by rememberSaveable { mutableStateOf(saved.host) }
     var port by rememberSaveable { mutableStateOf(saved.port.toString()) }
-    var tls by rememberSaveable { mutableStateOf(saved.tls) }
     var username by rememberSaveable { mutableStateOf(saved.username) }
     var password by rememberSaveable { mutableStateOf(saved.password) }
     var prefix by rememberSaveable { mutableStateOf(saved.prefix) }
@@ -88,11 +86,10 @@ fun SettingsScreen(
     // From the QR scanner, or a setup link sent by the Pocket AdBlock app.
     fun applyLink(link: SetupLink) {
         val p = link.applyTo(
-            Profile(host = host, port = port.toIntOrNull() ?: -1, tls = tls, username = username, password = password, prefix = prefix),
+            Profile(host = host, port = port.toIntOrNull() ?: -1, username = username, password = password, prefix = prefix),
         )
         host = p.host
         port = p.port.toString()
-        tls = p.tls
         username = p.username
         password = p.password
         prefix = p.prefix
@@ -125,7 +122,6 @@ fun SettingsScreen(
     val draft = Profile(
         host = host,
         port = port.toIntOrNull() ?: -1,
-        tls = tls,
         username = username,
         password = password,
         prefix = prefix,
@@ -173,31 +169,38 @@ fun SettingsScreen(
                 OutlinedTextField(
                     value = port,
                     onValueChange = { v -> port = v.filter { it.isDigit() }.take(5) },
-                    label = { Text("Port") },
+                    label = { Text("TLS port") },
                     singleLine = true,
                     isError = err(Profile.Field.PORT) != null,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                     modifier = Modifier.width(120.dp),
                 )
                 Spacer(Modifier.width(16.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("TLS", style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        if (tls) "Encrypted, certificate verified" else "Not encrypted",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (tls) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
-                    )
+                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Lock, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(8.dp))
+                    Column {
+                        Text("Always encrypted", style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            "TLS, certificate verified",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
-                Switch(
-                    checked = tls,
-                    onCheckedChange = { on ->
-                        tls = on
-                        port.toIntOrNull()?.let { port = Profile.portAfterTlsToggle(it, on).toString() }
-                    },
+            }
+            if (ui.savedWithoutTls) {
+                Text(
+                    "These settings were saved with TLS off. Pocket Wake now always connects with TLS: " +
+                        "enter the broker's TLS port (usually 8883), test and save.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 6.dp),
                 )
             }
             Text(
-                "EMQX Cloud: use the MQTT over TLS port (8883). The certificate is checked against the authorities Android trusts.",
+                "EMQX Cloud: use the MQTT over TLS port (8883). The certificate is checked against the authorities Android trusts. " +
+                    "Brokers without TLS aren't supported.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 6.dp),
@@ -351,7 +354,7 @@ private fun TestReportCard(r: TestReport, prefix: String) {
                 Icons.Filled.CheckCircle,
                 status.online,
                 "Connected in ${r.connectMillis} ms",
-                if (r.tls) "TLS certificate verified, login accepted" else "Login accepted (not encrypted)",
+                "TLS certificate verified, login accepted",
             )
             when (r.board) {
                 Presence.ONLINE -> ReportLine(Icons.Filled.CheckCircle, status.online, "Board online", "$prefix/status = online")

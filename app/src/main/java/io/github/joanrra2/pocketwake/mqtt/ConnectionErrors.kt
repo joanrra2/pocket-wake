@@ -48,10 +48,10 @@ object ConnectionErrors {
             return ConnectionProblem("The broker's TLS certificate isn't trusted by this phone", fatal = true)
         }
         if ("notsslrecordexception" in text || "not an ssl/tls record" in text) {
-            return ConnectionProblem("Port ${profile.port} doesn't speak TLS. Turn TLS off or use the TLS port (usually 8883)", fatal = true)
+            return ConnectionProblem("Port ${profile.port} isn't a TLS port. Pocket Wake only connects with TLS: use the broker's TLS port (usually 8883)", fatal = true)
         }
         if (find(SSLHandshakeException::class.java) != null) {
-            return ConnectionProblem("TLS handshake failed. Check the port and the TLS switch", fatal = true)
+            return ConnectionProblem("TLS handshake failed. Check that port ${profile.port} is the broker's TLS port (usually 8883)", fatal = true)
         }
         if (find(UnknownHostException::class.java) != null) {
             return ConnectionProblem("Can't find ${profile.host}. Check the address and your internet connection", fatal = false)
@@ -66,12 +66,10 @@ object ConnectionErrors {
             return ConnectionProblem("Can't reach ${profile.host}:${profile.port}. Check the address and port", fatal = false)
         }
         if (find(ConnectionClosedException::class.java) != null || find(ClosedChannelException::class.java) != null) {
-            val hint = if (profile.tls) {
-                " Is port ${profile.port} a TLS port? (EMQX Cloud: 8883)"
-            } else {
-                " Does port ${profile.port} need TLS?"
-            }
-            return ConnectionProblem("The broker closed the connection.$hint", fatal = false)
+            return ConnectionProblem(
+                "The broker closed the connection. Is port ${profile.port} a TLS port? (EMQX Cloud: 8883)",
+                fatal = false,
+            )
         }
         val deepest = chain.lastOrNull { it.message != null }
         val msg = deepest?.message ?: chain.lastOrNull()?.javaClass?.simpleName ?: "unknown error"

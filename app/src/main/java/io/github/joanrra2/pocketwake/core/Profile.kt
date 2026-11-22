@@ -9,7 +9,6 @@ data class Profile(
     val label: String = "Home",
     val host: String = "",
     val port: Int = DEFAULT_TLS_PORT,
-    val tls: Boolean = true,
     val username: String = "",
     val password: String = "",
     val prefix: String = Topics.DEFAULT_PREFIX,
@@ -36,20 +35,12 @@ data class Profile(
         prefix = Topics.normalizePrefix(prefix),
     )
 
-    /** "MQTT over TLS · port 8883". */
-    val transportLabel: String get() = (if (tls) "MQTT over TLS" else "MQTT, not encrypted") + " · port $port"
+    /** "MQTT over TLS · port 8883". The app only connects with TLS. */
+    val transportLabel: String get() = "MQTT over TLS · port $port"
 
     enum class Field { HOST, PORT, USERNAME, PASSWORD, PREFIX }
 
     companion object {
         const val DEFAULT_TLS_PORT = 8883
-        const val DEFAULT_PLAIN_PORT = 1883
-
-        /** Port to use after toggling TLS, keeping a custom port untouched. */
-        fun portAfterTlsToggle(port: Int, tls: Boolean): Int = when {
-            tls && port == DEFAULT_PLAIN_PORT -> DEFAULT_TLS_PORT
-            !tls && port == DEFAULT_TLS_PORT -> DEFAULT_PLAIN_PORT
-            else -> port
-        }
     }
 }

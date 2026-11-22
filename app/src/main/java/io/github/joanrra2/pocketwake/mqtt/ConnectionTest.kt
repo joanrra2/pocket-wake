@@ -22,7 +22,6 @@ data class TestReport(
     /** Null on success. */
     val error: String? = null,
     val connectMillis: Long? = null,
-    val tls: Boolean = true,
     /** Retained `<prefix>/status`; null = nothing seen (wrong prefix, or board never connected). */
     val board: Presence? = null,
     /** Hosts with a retained state, name -> presence. */
@@ -46,9 +45,18 @@ data class TestReport(
 
 object ConnectionTest {
     /** Connects once with [profile], listens briefly for retained board and PC states, disconnects. */
-    suspend fun run(profile: Profile, clientId: String, listenMillis: Long = 2500): TestReport = withContext(Dispatchers.IO) {
+    suspend fun run(profile: Profile, clientId: String, listenMillis: Long = 2500): TestReport =
+        run(profile, clientId, listenMillis, plainTcpForTests = false)
+
+    /** [plainTcpForTests] only for the opt-in AccessRulesTest; see [buildClient]. */
+    internal suspend fun run(
+        profile: Profile,
+        clientId: String,
+        listenMillis: Long,
+        plainTcpForTests: Boolean,
+    ): TestReport = withContext(Dispatchers.IO) {
         val p = profile.normalized()
-        val client = buildClient(p, "$clientId-test").buildAsync()
+        val client = buildClient(p, "$clientId-test", plainTcpForTests).buildAsync()
         val board = arrayOfNulls<Presence>(1)
         val hosts = ConcurrentHashMap<String, Presence>()
         val blocking = arrayOfNulls<Boolean>(1)
@@ -82,7 +90,6 @@ object ConnectionTest {
             delay(listenMillis)
             TestReport(
                 connectMillis = ms,
-                tls = p.tls,
                 board = board[0]?.takeIf { it != Presence.CLEARED },
                 hosts = hosts.toMap(),
                 denied = denied,
@@ -90,7 +97,7 @@ object ConnectionTest {
             )
         } catch (t: Throwable) {
             if (t is CancellationException && t !is TimeoutCancellationException) throw t
-            TestReport(error = ConnectionErrors.describe(t, p).message, tls = p.tls)
+            TestReport(error = ConnectionErrors.describe(t, p).message)
         } finally {
             runCatching { client.disconnect() }
         }

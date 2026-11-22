@@ -14,7 +14,7 @@ You need:
 - a phone: **Android** 8.0 or newer (the app), or an **iPhone / iPad** or any other device with
   a modern browser (the web app),
 - a free MQTT broker account (this guide uses **EMQX Cloud Serverless**; any MQTT broker
-  with TLS works).
+  with TLS works; the Android app doesn't connect without TLS).
 
 ## How the pieces talk
 
@@ -181,11 +181,11 @@ Both versions do the same thing and can be used side by side with the same phone
 3. Open **Pocket Wake → Set up broker**. The quickest way: on a computer, open the
    board's web page → **Wake-on-LAN** → **Phone app** card, type the phone's username
    (`pocket-phone`) there, and tap **Scan** in the app (allow the camera when asked). The
-   address, port, TLS, username and prefix fill in; type the password. The QR code never
+   address, port, username and prefix fill in; type the password. The QR code never
    contains a password. Or fill everything in by hand:
    - **Address**: the broker address **only**, e.g. `x1a2b3c4.ala.eu-central-1.emqxsl.com`
      (no `mqtts://`, no port)
-   - **Port** `8883`, **TLS** on
+   - **Port** `8883` (the app always uses TLS)
    - **Username** / **Password**: the **phone** login (`pocket-phone`)
    - **Topic prefix**: same as on the board (`sinkhole`)
 4. Tap **Test connection**. A good result shows:
@@ -255,7 +255,8 @@ Then connect to the PC with Remote Desktop, RustDesk, AnyDesk, Parsec…
 |---|---|
 | Wrong username or password | Use the **phone** login; re-type the password (Show reveals it). |
 | Login refused: check … access rules | A Client Authorization rule blocks the phone login (step 2.5). |
-| The broker closed the connection. Is port … a TLS port? | Android app: port 8883 with TLS **on**. Port 1883 is plain MQTT (not available on EMQX Serverless). |
+| The broker closed the connection. Is port … a TLS port? / Port … isn't a TLS port | The Android app always uses TLS: use port 8883. Port 1883 is plain MQTT, which the app doesn't support (and EMQX Serverless doesn't offer). |
+| This board uses a broker without TLS (when scanning the QR code) | The board's Broker URI starts with `mqtt://`. Use `mqtts://<broker>:8883` on the board (step 3), then scan again. |
 | Can't reach wss://… (web app) | Port 8084 and path `/mqtt` for EMQX Cloud; check the address. Browsers don't say which part failed. |
 | Can't find `<host>` | Typo in the address, or no internet on the phone. |
 | The broker's TLS certificate isn't trusted / doesn't match | Use the host name from the EMQX overview, not an IP address. |
